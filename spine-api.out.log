@@ -1,0 +1,5 @@
+[spine] Registered llama.cpp, models: ['DeepSeek-Coder-V2-Lite-Instruct-Q4_K_M', 'DeepSeek-R1-0528-Qwen3-8B-Q4_K_M', 'Phi-4-reasoning-plus-Q4_K_M', 'Qwen2.5-Coder-7b-instruct-q8_0', 'Qwen3-14B-Q4_K_M', 'Qwen3-8B-full', 'Qwen3.5-9B-Q8_0', 'Qwen3VL-8B-Instruct-Q4_K_M', 'dspark-DeepSeek-V4-Flash-0731-BF16', 'dspark-DeepSeek-V4-Flash-0731-Q8_0', 'gemma-4-26B-A4B-it-Q4_K_M', 'qwen2.5-coder-7b-instruct-q4_k_m', 'aetheris/nomic-embed-text', 'aetheris/phi4-mini', 'aetheris/qwen2.5-coder-7b', 'aetheris/qwen3-8b', 'aeth-gw/nomic-embed-text', 'aeth-gw/phi4-mini', 'aeth-gw/qwen2.5-coder-7b', 'aeth-gw/qwen3-8b']
+INFO:     127.0.0.1:64199 - "GET /api/v1/status HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57590 - "POST /api/v1/transform HTTP/1.1" 422 Unprocessable Content
+INFO:     127.0.0.1:54500 - "POST /api/v1/transform?intent=Verify+mesh+door+health+and+record+spine+cycle&provider=llama.cpp HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:51780 - "POST /api/v1/transform?intent=Verify+mesh+door+health+and+record+spine+cycle&provider=llama.cpp&scope=session HTTP/1.1" 500 Internal Server Error

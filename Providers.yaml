@@ -1,0 +1,51 @@
+providers:
+
+  # ── Local profile (default) ──────────────────────────────────────
+  local:
+    endpoint: http://127.0.0.1:8830/v1
+    models:
+      - Qwen3.5-9B-Q8_0
+      - Qwen3-8B-Q4_K_M
+      - Qwen2.5-Coder-7b-instruct-q8_0
+    strengths:
+      - local workloads
+      - offline
+      - sensitive data
+
+  # ── Cloud profile ────────────────────────────────────────────────
+  cloud:
+    openai:
+      endpoint: https://api.openai.com/v1
+      models:
+        - gpt-5
+      strengths:
+        - architecture
+        - reasoning
+    anthropic:
+      endpoint: https://api.anthropic.com/v1
+      models:
+        - sonnet
+        - opus
+      strengths:
+        - coding
+        - large context
+    huggingface:
+      endpoint: https://api-inference.huggingface.co/v1/chat/completions
+      models:
+        - google/gemma-2b-it
+        - meta-llama/Llama-3.1-8B-Instruct
+      strengths:
+        - open models
+        - rapid iteration
+
+  # ── Hybrid profile ───────────────────────────────────────────────
+  hybrid:
+    primary:
+      provider: anthropic
+      model: sonnet
+    fallback:
+      provider: openai
+      model: gpt-5
+    local_sensitive:
+      provider: llama.cpp
+      model: Qwen3.5-9B-Q8_0

@@ -1,0 +1,70 @@
+routes:
+
+  # ── Local profile ────────────────────────────────────────────────
+  local:
+    coding:
+      primary:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
+      fallback:
+        provider: local
+        model: Qwen3-8B-Q4_K_M
+    architecture:
+      primary:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
+    governance:
+      primary:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
+    local_sensitive:
+      primary:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
+
+  # ── Cloud profile ────────────────────────────────────────────────
+  cloud:
+    coding:
+      primary:
+        provider: anthropic
+        model: sonnet
+      fallback:
+        provider: openai
+        model: gpt-5
+    architecture:
+      primary:
+        provider: openai
+        model: gpt-5
+    governance:
+      primary:
+        provider: openai
+        model: gpt-5
+    local_sensitive:
+      primary:
+        provider: huggingface
+        model: meta-llama/Llama-3.1-8B-Instruct
+
+  # ── Hybrid profile ───────────────────────────────────────────────
+  hybrid:
+    coding:
+      primary:
+        provider: anthropic
+        model: sonnet
+      fallback:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
+    architecture:
+      primary:
+        provider: openai
+        model: gpt-5
+      fallback:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
+    governance:
+      primary:
+        provider: openai
+        model: gpt-5
+    local_sensitive:
+      primary:
+        provider: local
+        model: Qwen3.5-9B-Q8_0
