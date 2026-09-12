@@ -1,0 +1,20 @@
+Inside Claude Code:
+/spine 
+contains:
+1. SPINE.md 
+2.DECISIONS.md 
+3.USER_PROFILE.yaml 
+4.ROUTING.yaml 
+Every session loads:
+Python
+1. load_spine()
+2.
+3.load_context()
+4.
+5. load_decisions()
+6.
+7. load_preferences()
+8. 
+9. route_model()
+Before sending any prompt.
+This reproduces a large portion of the "Transformation Spine" behavior.

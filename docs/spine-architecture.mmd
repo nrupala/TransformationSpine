@@ -1,0 +1,30 @@
+```mermaid
+graph TD
+    subgraph Spine
+        SC[TRANSIENT] --> TS[Temporary Context]
+        SS[SESSION] --> ST[Active Session]
+        PS[PROJECT] --> PT[Project State]
+        PC[PERSISTENT] --> PG[Global State]
+
+        DS[Postgres] --> DT[Decision Store]
+        DS --> TT[Task Store]
+
+        QN[Qdrant] --> VK[Vector Knowledge]
+
+        RL[Claude] --> R[Provider Router]
+        RO[OpenAI] --> R
+        OA[Ollama] --> R
+        RV[Other] --> R
+
+        GC[GitHub] --> M[MCP Connector Layer]
+        AZ[Azure DevOps] --> M
+        CJ[Confluence] --> M
+        MJ[Jira] --> M
+        M --> R
+
+        SA[FastAPI] --> DS
+        SA --> TT
+        SA --> VK
+        SA --> R
+    end
+```

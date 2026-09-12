@@ -1,0 +1,22 @@
+Postgres
+   |
+Qdrant
+   |
+LiteLLM
+   |
+MCP Server Registry
+   |
+ACP Agent Registry
+   |
+Claude/OpenAI/Ollama
+
+
+Then add:
+
+Semantic Kernel
+LangGraph
+Model Context Protocol
+Agent-to-Agent communication
+GitHub automation
+Architecture memory graph
+Transformation knowledge graph

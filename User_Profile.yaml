@@ -1,0 +1,25 @@
+user:
+
+  name: Nrupal Akolkar
+
+preferences:
+
+  architecture_style:
+    - provider neutral
+    - platform first
+
+  preferred_outputs:
+    - markdown
+    - diagrams
+    - implementation plans
+
+  focus_areas:
+    - transformation
+    - enterprise ai
+    - agent platforms
+    - factory ai
+    - mcp
+
+decision_patterns:
+  - avoid lock in
+  - favour extensibility
