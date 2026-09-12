@@ -26,12 +26,14 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from spine import ContextScope
 from spine.adapters import LlamaCppProvider
 from spine.ctst import CTSTRecord
+from spine.oplog import get_logger
+from spine.oplog import log as oplog
 from spine.result import ProviderResult
 
 # ── Runtime state ──────────────────────────────────────────────────────
@@ -123,6 +125,8 @@ async def lifespan(app: Any) -> Any:
     ctst_ledger = CTSTLedger()
 
     # Register LlamaCppProvider (connects to :8830 OpenAI-compatible router)
+    op_logger = get_logger("spine")
+    oplog(op_logger, "spine starting")
     try:
         llm_provider = LlamaCppProvider(
             endpoint=os.environ.get("SPINE_LLAMA_ENDPOINT", "http://127.0.0.1:8830"),
@@ -131,11 +135,14 @@ async def lifespan(app: Any) -> Any:
         models = llm_provider.list_models()
         if models:
             provider_map["llama.cpp"] = llm_provider
-            print(f"[spine] Registered llama.cpp, models: {models}")
+            oplog(op_logger, "provider registered",
+                  provider="llama.cpp", models=len(models))
         else:
-            print("[spine] llama.cpp handshake: no models returned")
+            oplog(op_logger, "llama.cpp handshake: no models returned", level=30,
+                  provider="llama.cpp")
     except Exception as e:
-        print(f"[spine] Could not connect to llama.cpp on :8830: {e}")
+        oplog(op_logger, "could not connect to llama.cpp", level=40,
+              provider="llama.cpp", error=str(e))
 
     # Register OpenAIProvider only if OPENAI_API_KEY is set
     api_key = os.environ.get("OPENAI_API_KEY")
@@ -167,6 +174,28 @@ def create_app() -> FastAPI:
         description="Provider-neutral orchestration spine with outcome convergence",
         lifespan=lifespan,
     )
+
+    op_logger = get_logger("spine")
+    oplog(op_logger, "spine api created")
+
+    @app.middleware("http")
+    async def access_log_middleware(request: Request, call_next: Any) -> Any:
+        import time as _time
+        import uuid as _uuid
+
+        rid = _uuid.uuid4().hex[:12]
+        t0 = _time.time()
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            oplog(op_logger, "unhandled exception", level=40, request_id=rid,
+                  method=request.method, path=request.url.path, error=str(e))
+            raise
+        dur_ms = int((_time.time() - t0) * 1000)
+        response.headers["X-Request-Id"] = rid
+        oplog(op_logger, "access", request_id=rid, method=request.method,
+              path=request.url.path, status=response.status_code, duration_ms=dur_ms)
+        return response
 
     @app.get("/api/v1/status")
     async def status() -> dict[str, Any]:

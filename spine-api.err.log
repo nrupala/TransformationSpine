@@ -207,3 +207,7 @@ Traceback (most recent call last):
   File "C:\Users\nrupa\AppData\Roaming\Python\Python314\site-packages\httpx\_transports\default.py", line 118, in map_httpcore_exceptions
     raise mapped_exc(message) from exc
 httpx.ReadTimeout: timed out
+INFO:     Started server process [35072]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8801 (Press CTRL+C to quit)

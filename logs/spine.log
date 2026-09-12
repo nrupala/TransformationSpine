@@ -1,0 +1,20 @@
+{"ts": "2026-09-12T23:39:51Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "spine api created"}
+{"ts": "2026-09-12T23:39:52Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "1d0037e25dc9", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 1}
+{"ts": "2026-09-12T23:39:52Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "ef4b775bfe6a", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:39:52Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "25047dee5288", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:40:21Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "spine api created"}
+{"ts": "2026-09-12T23:40:22Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "176f8a89ac71", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 1}
+{"ts": "2026-09-12T23:40:22Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "416a07f51f55", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:40:22Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "2fd8738332ae", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:40:47Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "spine api created"}
+{"ts": "2026-09-12T23:40:48Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "07f634283989", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 1}
+{"ts": "2026-09-12T23:40:48Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "f4d47e3a4d95", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:40:48Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "f5f51104ce2f", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:40:49Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "spine api created"}
+{"ts": "2026-09-12T23:40:49Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "spine starting"}
+{"ts": "2026-09-12T23:40:50Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "provider registered", "provider": "llama.cpp", "models": 20}
+{"ts": "2026-09-12T23:40:55Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "7a1882c03e09", "method": "GET", "path": "/api/v1/status", "status": 200, "duration_ms": 1}
+{"ts": "2026-09-12T23:41:25Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "spine api created"}
+{"ts": "2026-09-12T23:41:26Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "e93e5a060577", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 1}
+{"ts": "2026-09-12T23:41:26Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "b2dc463c76b3", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
+{"ts": "2026-09-12T23:41:26Z", "level": "info", "service": "spine", "version": "0.2.0", "msg": "access", "request_id": "cc3ec831753b", "method": "GET", "path": "/api/v1/telemetry", "status": 200, "duration_ms": 0}
