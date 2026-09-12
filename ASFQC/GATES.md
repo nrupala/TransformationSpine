@@ -21,6 +21,7 @@ Last updated: 2026-09-10
 | G6 | Release process | PASS | CHANGELOG.md + versioning + tag strategy defined | present | semver, `v0.1.0` tag |
 | G7 | Governance (decisions/ADR) | PASS | Decisions.md + AGENT_CONTRACT.md present | present | existing + extended |
 | G8 | CI/CD pipeline | PASS | `.github/workflows/ci.yml` defined | file present | ruff → mypy → pytest on push/PR |
+| G10 | Operability (ops logs) | PASS | `src/spine/oplog.py` JSON-lines + rotation; access middleware with X-Request-Id; live evidence: `logs/spine.log` shows startup/provider/access lines; ERROR mirror to `logs/errors.log` | `{"level":"info","service":"spine","msg":"access","request_id":"7a1882c03e09","path":"/api/v1/status","status":200}` observed 2026-09-12 |
 
 ---
 
