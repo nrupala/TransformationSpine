@@ -128,9 +128,13 @@ async def lifespan(app: Any) -> Any:
     op_logger = get_logger("spine")
     oplog(op_logger, "spine starting")
     try:
+        # Default: Qwen3.5-9B-Q8_0 — verified tool-capable (structured
+        # tool_calls, finish_reason=tool_calls) per the 2026-09-13 local
+        # tool-call smoke test. Qwen2.5-Coder models emit pseudo-XML tool
+        # calls as plain content on this route and are NOT tool-compatible.
         llm_provider = LlamaCppProvider(
             endpoint=os.environ.get("SPINE_LLAMA_ENDPOINT", "http://127.0.0.1:8830"),
-            model=os.environ.get("SPINE_LLAMA_MODEL", "Qwen2.5-Coder-7b-instruct-q8_0"),
+            model=os.environ.get("SPINE_LLAMA_MODEL", "Qwen3.5-9B-Q8_0"),
         )
         models = llm_provider.list_models()
         if models:
