@@ -56,6 +56,7 @@ from .tokenplan import (
     plan_max_tokens,
     route_spec,
 )
+from .tools import ToolRegistry, run_tool_loop
 
 __all__ = [
     "ContextFact",
@@ -70,6 +71,8 @@ __all__ = [
     "ContextStore",
     "ScopeViolationError",
     "snapshot_for_prompt",
+    "ToolRegistry",
+    "run_tool_loop",
     "CTSTRecord",
     "CTSTLedger",
     "build_provider_map",

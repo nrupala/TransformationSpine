@@ -41,6 +41,7 @@ from spine.result import ProviderResult
 store: Any = None  # ContextStore — initialized in lifespan
 ctst_ledger: Any = None  # CTSTLedger — initialized in lifespan
 provider_map: dict[str, Any] = {}  # name → Provider instance
+tool_registry: Any = None  # ToolRegistry — initialized in lifespan
 
 
 # ── Helper functions ─────────────────────────────────────────────────
@@ -82,12 +83,25 @@ def _run_gated_cycle(
     import time as _time
 
     t0 = _time.time()
-    result: ProviderResult = provider.complete(
-        prompt=prompt,
-        context=context,
-        max_tokens=max_tokens,
-        temperature=0.0,
-    )
+    if tool_registry is not None:
+        # Tool calls the provider returns are executed by the registry
+        # and their results fed back for a final answer (spine.tools).
+        from spine.tools import run_tool_loop
+
+        result: ProviderResult = run_tool_loop(
+            provider,
+            prompt,
+            context,
+            tool_registry,
+            max_tokens=max_tokens,
+        )
+    else:
+        result = provider.complete(
+            prompt=prompt,
+            context=context,
+            max_tokens=max_tokens,
+            temperature=0.0,
+        )
     latency_ms = int((_time.time() - t0) * 1000)
 
     # The authoritative error signal is computed here, by the caller-side
@@ -126,7 +140,7 @@ def _run_gated_cycle(
 
 @asynccontextmanager
 async def lifespan(app: Any) -> Any:
-    global store, ctst_ledger, provider_map
+    global store, ctst_ledger, provider_map, tool_registry
 
     # Import the package modules after app starts to avoid circular deps
     from spine.ctst import CTSTLedger  # noqa: F811
@@ -138,6 +152,18 @@ async def lifespan(app: Any) -> Any:
         path=os.environ.get("SPINE_CONTEXT_PATH", "spine-context.json")
     )
     ctst_ledger = CTSTLedger()
+
+    # Tool registry: definitions from tools.yaml when present, else the
+    # built-in defaults. SPINE_TOOLS_PATH overrides the location.
+    from spine.tools import ToolRegistry
+
+    tools_path = os.environ.get(
+        "SPINE_TOOLS_PATH", os.path.join(os.getcwd(), "tools.yaml")
+    )
+    if os.path.exists(tools_path):
+        tool_registry = ToolRegistry.from_yaml(tools_path)
+    else:
+        tool_registry = ToolRegistry.defaults()
 
     # Register providers for the active profile (SPINE_PROFILE env,
     # default "local") from Providers.yaml via the factory, when the
@@ -176,6 +202,7 @@ async def lifespan(app: Any) -> Any:
         yield
         store = None
         ctst_ledger = None
+        tool_registry = None
         provider_map.clear()
         return
     try:
@@ -215,6 +242,7 @@ async def lifespan(app: Any) -> Any:
     # Cleanup
     store = None
     ctst_ledger = None
+    tool_registry = None
     provider_map.clear()
 
 
@@ -402,6 +430,9 @@ def create_app() -> FastAPI:
                     "estimated_input_tokens": token_plan["estimated_input_tokens"],
                     "planned_max_tokens": token_plan["planned_max_tokens"],
                     "context_window": token_plan["context_window"],
+                    "tool_executions": len(
+                        provider_result.metadata.get("tool_executions", [])
+                    ),
                 },
             )
             ctst_ledger.append(record)
