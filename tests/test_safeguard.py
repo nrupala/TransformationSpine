@@ -13,10 +13,15 @@ from spine.safeguard import (
 
 
 def test_get_project_root_is_project_directory() -> None:
-    """Project root is the spine repository directory."""
+    """Project root is the spine repository directory.
+
+    Identified structurally (it holds pyproject.toml and src/), never
+    by checkout directory name — a checkout may live under any name.
+    """
     root = get_project_root()
-    assert root.name == "TransformationSpine"
-    assert root.exists()
+    assert root.exists() and root.is_dir()
+    assert (root / "pyproject.toml").exists()
+    assert (root / "src" / "spine").is_dir()
 
 
 def test_check_path_restriction_accepts_project_path() -> None:

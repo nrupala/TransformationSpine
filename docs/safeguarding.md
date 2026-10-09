@@ -38,6 +38,7 @@ The safeguard module integrates with the spine runtime:
 ```python
 from spine.safeguard import check_path_restriction, _PROJECT_ROOT
 
+
 def safe_write(path: Path, content: str) -> None:
     if check_path_restriction(path)["restricted"]:
         raise PermissionError(f"Write to {path} rejected: outside project directory")
@@ -51,6 +52,7 @@ All file operations are validated against the project root:
 
 ```python
 PROJECT_ROOT = Path(__file__).resolve().parents[2]  # .../TransformationSpine
+
 
 def verify_path(path: Path) -> Path:
     resolved = path.resolve()
@@ -71,12 +73,14 @@ All file operations are logged to the CTST ledger when writing outside allowed p
 
 ```python
 if not within_project:
-    ctst_ledger.append(CTSTRecord(
-        intent={"summary": "illegal_write_attempt", "path": str(path)},
-        mechanism="safeguard",
-        error_signal=1.0,
-        committed=False,
-    ))
+    ctst_ledger.append(
+        CTSTRecord(
+            intent={"summary": "illegal_write_attempt", "path": str(path)},
+            mechanism="safeguard",
+            error_signal=1.0,
+            committed=False,
+        )
+    )
 ```
 
 ## Rollback Strategy
@@ -94,6 +98,7 @@ The `spine_cli.py` validates paths before any file operation:
 
 ```python
 from spine.safeguard import check_path_restriction
+
 
 def safe_read(path_str: str) -> str:
     result = check_path_restriction(Path(path_str))

@@ -21,8 +21,10 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
       - name: Lint (ruff)
-        run: python -m ruff check src tests
+        run: python -m ruff check src tests spine_cli.py
+      - name: Format (ruff)
+        run: python -m ruff format --check src tests spine_cli.py
       - name: Typecheck (mypy)
         run: python -m mypy src
       - name: Test (pytest)
-        run: python -m pytest tests -q
+        run: python -m pytest tests -q --cov=src/spine --cov-fail-under=80

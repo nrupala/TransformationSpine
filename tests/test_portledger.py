@@ -1,4 +1,5 @@
 """Vendored PortLedger (spine.portledger) — smoke + behavior tests."""
+
 import json
 
 from spine.portledger import PortLedger, __version__
@@ -18,6 +19,7 @@ def test_allocate_prefers_free(tmp_path):
 
 def test_conflict_scan(tmp_path, monkeypatch):
     import socket
+
     s = socket.socket()
     s.bind(("127.0.0.1", 22890))
     s.listen(1)

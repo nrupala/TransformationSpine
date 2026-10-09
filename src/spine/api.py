@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """TransformationSpine FastAPI application.
 
 The spine API orchestrates the closed-loop control cycle:
@@ -24,12 +26,15 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException, Request
+
+if TYPE_CHECKING:
+    from spine.agent_surfaces import A2AAgent, ACPAgent
 from fastapi.responses import JSONResponse
 
-from spine import ContextScope
+from spine import ContextScope, __version__
 from spine.adapters import LlamaCppProvider
 from spine.ctst import CTSTRecord
 from spine.oplog import get_logger
@@ -41,6 +46,8 @@ from spine.result import ProviderResult
 store: Any = None  # ContextStore — initialized in lifespan
 ctst_ledger: Any = None  # CTSTLedger — initialized in lifespan
 provider_map: dict[str, Any] = {}  # name → Provider instance
+tool_registry: Any = None  # ToolRegistry — initialized in lifespan
+connector_registry: Any = None  # ConnectorRegistry — initialized in lifespan
 
 
 # ── Helper functions ─────────────────────────────────────────────────
@@ -53,8 +60,7 @@ def _render_context(scope: Any = None) -> str:
     # Use the store's visible_to which already filters by scope
     facts = store.visible_to(scope or __import__("spine").ContextScope.SESSION)
     return "\n\n".join(
-        f"#{f.key} [{f.scope}] (origin: {f.origin or 'unknown'})"
-        f"\n{f.value}"
+        f"#{f.key} [{f.scope}] (origin: {f.origin or 'unknown'})\n{f.value}"
         for f in facts
     )
 
@@ -63,6 +69,7 @@ def _run_gated_cycle(
     provider_name: str,
     prompt: str,
     context: Any,
+    max_tokens: int = 512,
 ) -> dict[str, Any]:
     """Run one gated transformation cycle against a registered provider.
 
@@ -78,22 +85,43 @@ def _run_gated_cycle(
             "reason": f"Provider '{provider_name}' not registered",
         }
 
-    result: ProviderResult = provider.complete(
-        prompt=prompt,
-        context=context,
-        max_tokens=512,
-        temperature=0.0,
-    )
+    import time as _time
 
-    error_signal = result.error_signal
+    t0 = _time.time()
+    if tool_registry is not None:
+        # Tool calls the provider returns are executed by the registry
+        # and their results fed back for a final answer (spine.tools).
+        from spine.tools import run_tool_loop
+
+        result: ProviderResult = run_tool_loop(
+            provider,
+            prompt,
+            context,
+            tool_registry,
+            max_tokens=max_tokens,
+        )
+    else:
+        result = provider.complete(
+            prompt=prompt,
+            context=context,
+            max_tokens=max_tokens,
+            temperature=0.0,
+        )
+    latency_ms = int((_time.time() - t0) * 1000)
+
+    # The authoritative error signal is computed here, by the caller-side
+    # gates (spine.gates) — never trusted from the adapter, whose own
+    # error_signal is only a transport hint.
+    from spine.gates import evaluate_result
+
+    report = evaluate_result(result)
+    error_signal = report.error_signal
     output = result.output or ""
 
-    # Simple gate: error_signal must be 0.0 (converged) and output non-empty
-    # to count as committed. In production this would call pytest/ruff/etc.
     if error_signal == 0.0 and output:
         verdict = "commit"
         committed = True
-    elif error_signal > 0.0 and error_signal < 1.0:
+    elif 0.0 < error_signal < 1.0:
         verdict = "retry"
         committed = False
     else:
@@ -106,27 +134,93 @@ def _run_gated_cycle(
         "verdict": verdict,
         "committed": committed,
         "reason": f"error_signal={error_signal:.3f}, provider={provider_name}",
+        "gates": report.to_dict(),
+        "latency_ms": latency_ms,
+        "provider_result": result,
     }
 
 
 # ── Lifespan ─────────────────────────────────────────────────────────
 
 
-@asynccontextmanager
-async def lifespan(app: Any) -> Any:
-    global store, ctst_ledger, provider_map
+def _init_state() -> None:
+    """Initialize all spine state (store, ledger, registries, providers).
+
+    Called by the FastAPI lifespan and by non-HTTP transports (the MCP
+    stdio server) so every surface runs the identical spine.
+    """
+    global store, ctst_ledger, provider_map, tool_registry, connector_registry
 
     # Import the package modules after app starts to avoid circular deps
     from spine.ctst import CTSTLedger  # noqa: F811
     from spine.store import ContextStore  # noqa: F811
 
-    # Initialize context store and CTST ledger
-    store = ContextStore()
+    # Initialize context store (durable backing: PROJECT/PERSISTENT facts
+    # survive restarts; path overridable via SPINE_CONTEXT_PATH) and ledger.
+    store = ContextStore(
+        path=os.environ.get("SPINE_CONTEXT_PATH", "spine-context.json")
+    )
     ctst_ledger = CTSTLedger()
 
-    # Register LlamaCppProvider (connects to :8830 OpenAI-compatible router)
+    # Tool registry: definitions from tools.yaml when present, else the
+    # built-in defaults. SPINE_TOOLS_PATH overrides the location.
+    from spine.tools import ToolRegistry
+
+    tools_path = os.environ.get(
+        "SPINE_TOOLS_PATH", os.path.join(os.getcwd(), "tools.yaml")
+    )
+    if os.path.exists(tools_path):
+        tool_registry = ToolRegistry.from_yaml(tools_path)
+    else:
+        tool_registry = ToolRegistry.defaults()
+
+    # Connector registry: built-ins + entry-point plugins + directory
+    # plugins (SPINE_CONNECTOR_PATH / ./connectors). Discovery never
+    # raises; broken plugins are reported, not fatal.
+    from spine.discovery import ConnectorRegistry
+
+    connector_registry = ConnectorRegistry.discover()
+
+    # Register providers for the active profile (SPINE_PROFILE env,
+    # default "local") from Providers.yaml via the factory, when the
+    # file is present. Profiles genuinely select: cloud registers the
+    # keyed cloud adapters, hybrid registers local + cloud, local only
+    # the llama.cpp route. Without a Providers.yaml, fall back to the
+    # historical env-driven registration below.
     op_logger = get_logger("spine")
     oplog(op_logger, "spine starting")
+    profile = os.environ.get("SPINE_PROFILE", "local")
+    providers_yaml = os.path.join(os.getcwd(), "Providers.yaml")
+    if os.path.exists(providers_yaml):
+        try:
+            import yaml as _yaml
+
+            from spine.factory import build_provider_map
+
+            with open(providers_yaml, encoding="utf-8") as f:
+                providers_data = _yaml.safe_load(f) or {}
+            for name, instance in build_provider_map(profile, providers_data).items():
+                if name == "llama.cpp":
+                    models = instance.list_models()
+                    if not models:
+                        oplog(
+                            op_logger,
+                            "llama.cpp handshake: no models returned",
+                            level=30,
+                            provider="llama.cpp",
+                        )
+                        continue
+                provider_map[name] = instance
+                oplog(op_logger, "provider registered", provider=name, profile=profile)
+        except Exception as e:
+            oplog(
+                op_logger,
+                "profile provider load failed",
+                level=40,
+                profile=profile,
+                error=str(e),
+            )
+        return
     try:
         # Default: Qwen3.5-9B-Q8_0 — verified tool-capable (structured
         # tool_calls, finish_reason=tool_calls) per the 2026-09-13 local
@@ -139,42 +233,374 @@ async def lifespan(app: Any) -> Any:
         models = llm_provider.list_models()
         if models:
             provider_map["llama.cpp"] = llm_provider
-            oplog(op_logger, "provider registered",
-                  provider="llama.cpp", models=len(models))
+            oplog(
+                op_logger,
+                "provider registered",
+                provider="llama.cpp",
+                models=len(models),
+            )
         else:
-            oplog(op_logger, "llama.cpp handshake: no models returned", level=30,
-                  provider="llama.cpp")
+            oplog(
+                op_logger,
+                "llama.cpp handshake: no models returned",
+                level=30,
+                provider="llama.cpp",
+            )
     except Exception as e:
-        oplog(op_logger, "could not connect to llama.cpp", level=40,
-              provider="llama.cpp", error=str(e))
+        oplog(
+            op_logger,
+            "could not connect to llama.cpp",
+            level=40,
+            provider="llama.cpp",
+            error=str(e),
+        )
 
     # Register OpenAIProvider only if OPENAI_API_KEY is set
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
         try:
             from spine.adapters import OpenAIProvider  # noqa: F811
+
             oa_provider = OpenAIProvider(api_key=api_key)
             provider_map["openai"] = oa_provider
             print("[spine] Registered OpenAIProvider")
         except Exception as e:
             print(f"[spine] Could not register OpenAIProvider: {e}")
 
-    yield  # app runs
+    return
 
-    # Cleanup
+
+def _teardown_state() -> None:
+    """Release all spine state."""
+    global store, ctst_ledger, tool_registry, connector_registry
+    global _a2a_agent, _acp_agent
+    _a2a_agent = None
+    _acp_agent = None
     store = None
     ctst_ledger = None
+    tool_registry = None
+    connector_registry = None
     provider_map.clear()
 
 
+@asynccontextmanager
+async def lifespan(app: Any) -> Any:
+    _init_state()
+    yield  # app runs
+    _teardown_state()
+
+
 # ── FastAPI application factory ──────────────────────────────────────
+
+
+class CycleError(Exception):
+    """Transport-neutral cycle failure carrying an HTTP-style status."""
+
+    def __init__(self, status_code: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+def execute_transform(
+    intent: str,
+    provider: str = "llama.cpp",
+    scope: str = "SESSION",
+) -> dict[str, Any]:
+    """Submit a transformation intent and execute the gated cycle.
+
+    Args:
+        intent: What to accomplish (user description).
+        provider: Which Provider adapter to use (registered in lifespan).
+        scope: Context scope to assemble for the prompt.
+
+    Returns:
+        Dict with output, error_signal, verdict, committed flag, and
+        the rendered context.
+    """
+    if provider not in provider_map:
+        available = list(provider_map.keys())
+        raise CycleError(
+            status_code=400,
+            detail=f"Provider '{provider}' not available. Available: {available}",
+        )
+
+    if store is None:
+        raise CycleError(status_code=503, detail="Spine not initialized")
+
+    # Scope names arrive as API input ("SESSION"); enum values are
+    # lowercase. Normalize, and reject unknown scopes with a 400 —
+    # previously the default itself raised an uncaught ValueError.
+    try:
+        scope_enum = ContextScope(scope.lower())
+    except ValueError:
+        raise CycleError(
+            status_code=400,
+            detail=f"Unknown scope '{scope}'. Valid: {[s.value for s in ContextScope]}",
+        ) from None
+
+    # Assemble in-scope context facts
+    context_facts = store.visible_to(scope_enum)
+
+    # Token-efficiency engine (ENGINE-SPEC-v1, as live in MyMilo):
+    # two-tier, cache-stable assembly under a budget derived from the
+    # route registry — never an unbounded context dump — and a
+    # planned output cap instead of a hardcoded max_tokens.
+    from spine.assembly import assemble_context
+    from spine.tokenplan import (
+        ContextOverflowError,
+        estimate_tokens,
+        plan_max_tokens,
+        route_spec,
+    )
+
+    spec = route_spec(provider)
+    summary_fact = next(
+        (f for f in context_facts if f.key.startswith("session-summary:")),
+        None,
+    )
+    summary_text: str | None = None
+    summary_covers = 0
+    assembly_facts = context_facts
+    if summary_fact is not None:
+        summary_text = str(summary_fact.value)
+        assembly_facts = [f for f in context_facts if f is not summary_fact]
+        origin = summary_fact.origin or ""
+        if origin.startswith("compacted:"):
+            try:
+                summary_covers = int(origin.split(":")[1])
+            except (IndexError, ValueError):
+                summary_covers = 0
+
+    budget = max(
+        512,
+        spec.context_window - spec.margin - spec.default_max_tokens,
+    )
+    assembly = assemble_context(
+        assembly_facts,
+        query=intent,
+        summary=summary_text,
+        summary_covers=summary_covers,
+        budget_tokens=budget,
+    )
+    prompt = "\n\n".join(
+        part for part in (assembly.text, f"Transform intent: {intent}") if part
+    )
+    estimated_input = assembly.estimated_tokens + estimate_tokens(intent) + 16
+    try:
+        planned_max = plan_max_tokens(spec, estimated_input)
+    except ContextOverflowError as e:
+        raise CycleError(status_code=400, detail=str(e)) from None
+
+    # Run one gated cycle with the planned output cap
+    result = _run_gated_cycle(provider, prompt, context_facts, max_tokens=planned_max)
+    token_plan = {
+        "route": spec.name,
+        "context_window": spec.context_window,
+        "estimated_input_tokens": estimated_input,
+        "planned_max_tokens": planned_max,
+        "facts_used": assembly.facts_used,
+        "facts_dropped": assembly.facts_dropped,
+    }
+
+    # Record EVERY cycle in the CTST ledger — the ledger is the record
+    # of transformation *attempts* (committed and rejected alike), with
+    # the verdict, gate evidence, and telemetry attached. Before this,
+    # only committed cycles were written, and they were written with
+    # committed=False and no telemetry, so the ledger and the
+    # /telemetry endpoint could never show what actually happened.
+    if ctst_ledger:
+        provider_result: ProviderResult = result["provider_result"]
+        record = CTSTRecord(
+            intent={"summary": intent, "provider": provider},
+            context={f.key: f.value for f in context_facts},
+            mechanism=provider,
+            outcome={"output": result["output"]},
+            assessment={
+                "verdict": result["verdict"],
+                "gates": result["gates"],
+            },
+            error_signal=result["error_signal"],
+            committed=bool(result["committed"]),
+            telemetry={
+                **provider_result.telemetry,
+                "latency_ms": result["latency_ms"],
+                "error_signal": result["error_signal"],
+                "estimated_input_tokens": token_plan["estimated_input_tokens"],
+                "planned_max_tokens": token_plan["planned_max_tokens"],
+                "context_window": token_plan["context_window"],
+                "tool_executions": len(
+                    provider_result.metadata.get("tool_executions", [])
+                ),
+            },
+        )
+        ctst_ledger.append(record)
+
+    return {
+        "intent": intent,
+        "provider": provider,
+        "scope": scope,
+        "output": result["output"],
+        "error_signal": result["error_signal"],
+        "verdict": result["verdict"],
+        "committed": result["committed"],
+        "gates": result["gates"],
+        "token_plan": token_plan,
+        "context_rendered": _render_context(scope_enum),
+    }
+
+
+def build_status() -> dict[str, Any]:
+    """Health+status endpoint."""
+    providers = list(provider_map.keys()) if provider_map else []
+    # Safeguard posture is part of status: count world-writable
+    # files under the project root (the enforceable check in
+    # spine.safeguard) instead of merely asserting safeguards exist.
+    world_writable = -1
+    _root = ""
+    try:
+        from spine.safeguard import get_project_root, world_writable_count
+
+        world_writable = world_writable_count()
+        _root = str(get_project_root())
+    except Exception:
+        pass
+    return {
+        "status": "ok",
+        "providers": providers,
+        "context_size": len(store.visible_to(ContextScope.SESSION)) if store else 0,
+        "ledger_entries": len(ctst_ledger.read()) if ctst_ledger else 0,
+        "safeguards": {
+            "project_root": _root,
+            "world_writable_files": world_writable,
+        },
+        "tools": tool_registry.names() if tool_registry else [],
+        "connectors": connector_registry.names() if connector_registry else [],
+    }
+
+
+_a2a_agent: A2AAgent | None = None
+_acp_agent: ACPAgent | None = None
+
+
+def _get_a2a_agent() -> A2AAgent:
+    """The A2A handler (task store lives for the app's lifetime)."""
+    global _a2a_agent
+    if _a2a_agent is None:
+        from spine import __version__ as _v
+        from spine.agent_surfaces import A2AAgent
+
+        _a2a_agent = A2AAgent(
+            transform=lambda **kw: execute_transform(**kw), version=_v
+        )
+    return _a2a_agent
+
+
+def _get_acp_agent() -> ACPAgent:
+    """The ACP handler (run store lives for the app's lifetime)."""
+    global _acp_agent
+    if _acp_agent is None:
+        from spine import __version__ as _v
+        from spine.agent_surfaces import ACPAgent
+
+        _acp_agent = ACPAgent(
+            transform=lambda **kw: execute_transform(**kw), version=_v
+        )
+    return _acp_agent
+
+
+def build_mcp_server() -> Any:
+    """Bind the live spine state into an MCP server (see spine.mcp_server).
+
+    Used by POST /mcp and by `spine mcp` (stdio) so agents get the same
+    tools, gates, ledger, and connectors as every other surface.
+    """
+    from spine import __version__ as _pkg_version
+    from spine.mcp_server import MCPServer
+
+    def _context(scope: str) -> dict[str, Any]:
+        try:
+            scope_enum = ContextScope(scope.lower())
+        except ValueError:
+            raise ValueError(
+                f"Unknown scope '{scope}'. Valid: {[s.value for s in ContextScope]}"
+            ) from None
+        return {
+            "scope": scope_enum.value,
+            "rendered": _render_context(scope_enum),
+        }
+
+    def _verify() -> dict[str, Any]:
+        if ctst_ledger is None:
+            raise RuntimeError("Spine not initialized")
+        return {
+            "valid": ctst_ledger.verify_chain(),
+            "head_hash": ctst_ledger.head_hash,
+            "records": len(ctst_ledger.query()),
+        }
+
+    def _connector_execute(
+        connector: str, tool: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        if connector_registry is None:
+            raise RuntimeError("Spine not initialized")
+        conn = connector_registry.get(connector)
+        if conn is None:
+            raise ValueError(f"Unknown connector '{connector}'")
+        result = conn.execute(tool, params)
+        return {
+            "connector": connector,
+            "tool": result.tool,
+            "success": result.success,
+            "output": result.output,
+            "error": result.error,
+        }
+
+    connector_tools: list[dict[str, Any]] = []
+    if connector_registry is not None:
+        for name in connector_registry.names():
+            conn = connector_registry.get(name)
+            if conn is None:
+                continue
+            try:
+                caps = conn.declare_capabilities()
+            except Exception:
+                caps = []
+            for cap in caps:
+                connector_tools.append(
+                    {
+                        "connector": name,
+                        "tool": cap.name,
+                        "description": cap.description,
+                        "input_schema": cap.input_schema,
+                    }
+                )
+
+    spine_tools: dict[str, Any] = {}
+    if tool_registry is not None:
+        registry_ref = tool_registry
+        for tool_name in registry_ref.names():
+            spine_tools[tool_name] = (
+                lambda n: lambda args: registry_ref.execute(n, args)
+            )(tool_name)
+
+    return MCPServer(
+        transform=lambda **kw: execute_transform(**kw),
+        status=build_status,
+        context=_context,
+        ledger_verify=_verify,
+        connector_execute=_connector_execute,
+        connector_tools=connector_tools,
+        spine_tools=spine_tools,
+        version=_pkg_version,
+    )
 
 
 def create_app() -> FastAPI:
     """Factory for the spine FastAPI application."""
     app = FastAPI(
         title="Transformation Spine API",
-        version="0.1.0",
+        version=__version__,
         description="Provider-neutral orchestration spine with outcome convergence",
         lifespan=lifespan,
     )
@@ -192,25 +618,33 @@ def create_app() -> FastAPI:
         try:
             response = await call_next(request)
         except Exception as e:
-            oplog(op_logger, "unhandled exception", level=40, request_id=rid,
-                  method=request.method, path=request.url.path, error=str(e))
+            oplog(
+                op_logger,
+                "unhandled exception",
+                level=40,
+                request_id=rid,
+                method=request.method,
+                path=request.url.path,
+                error=str(e),
+            )
             raise
         dur_ms = int((_time.time() - t0) * 1000)
         response.headers["X-Request-Id"] = rid
-        oplog(op_logger, "access", request_id=rid, method=request.method,
-              path=request.url.path, status=response.status_code, duration_ms=dur_ms)
+        oplog(
+            op_logger,
+            "access",
+            request_id=rid,
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=dur_ms,
+        )
         return response
 
     @app.get("/api/v1/status")
     async def status() -> dict[str, Any]:
         """Health+status endpoint."""
-        providers = list(provider_map.keys()) if provider_map else []
-        return {
-            "status": "ok",
-            "providers": providers,
-            "context_size": len(store.visible_to(ContextScope.SESSION)) if store else 0,
-            "ledger_entries": len(ctst_ledger.read()) if ctst_ledger else 0,
-        }
+        return build_status()
 
     @app.get("/api/v1/context")  # noqa: F821
     async def context_endpoint() -> JSONResponse:
@@ -225,62 +659,11 @@ def create_app() -> FastAPI:
         provider: str = "llama.cpp",
         scope: str = "SESSION",
     ) -> dict[str, Any]:
-        """Submit a transformation intent and execute the gated cycle.
-
-        Args:
-            intent: What to accomplish (user description).
-            provider: Which Provider adapter to use (registered in lifespan).
-            scope: Context scope to assemble for the prompt.
-
-        Returns:
-            Dict with output, error_signal, verdict, committed flag, and
-            the rendered context.
-        """
-        if provider not in provider_map:
-            available = list(provider_map.keys())
-            raise HTTPException(
-                status_code=400,
-                detail=f"Provider '{provider}' not available. "
-                f"Available: {available}",
-            )
-
-        if store is None:
-            raise HTTPException(status_code=503, detail="Spine not initialized")
-
-        # Assemble in-scope context facts
-        context_facts = store.visible_to(ContextScope(scope))
-
-        # Build a prompt from those facts + the user's intent
-        prompt_parts = [
-            "\n".join(f"- {f.key}: {f.value}" for f in context_facts),
-            "",
-            f"Transform intent: {intent}",
-        ]
-        prompt = "\n".join(part for part in prompt_parts if part)
-
-        # Run one gated cycle
-        result = _run_gated_cycle(provider, prompt, context_facts)
-
-        # If the cycle committed, record a CTST entry
-        if ctst_ledger and result["committed"]:
-            record = CTSTRecord(
-                intent={"summary": intent, "provider": provider},
-                context={f.key: f.value for f in context_facts},
-                mechanism=provider,
-                error_signal=result["error_signal"],
-            )
-            ctst_ledger.append(record)
-
-        return {
-            "intent": intent,
-            "provider": provider,
-            "scope": scope,
-            "output": result["output"],
-            "error_signal": result["error_signal"],
-            "verdict": result["verdict"],
-            "committed": result["committed"],
-            "context_rendered": _render_context(ContextScope(scope)),
-        }
+        """Submit a transformation intent and execute the gated cycle."""
+        try:
+            return execute_transform(intent, provider, scope)
+        except CycleError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.detail) from None
 
     @app.get("/api/v1/ledger")
     async def ledger() -> dict[str, Any]:
@@ -301,6 +684,95 @@ def create_app() -> FastAPI:
             "records": len(ctst_ledger.query()),
         }
 
+    @app.get("/api/v1/connectors")
+    async def connectors() -> dict[str, Any]:
+        """Discovered connectors (built-in + plugins) and their tools."""
+        if connector_registry is None:
+            raise HTTPException(status_code=503, detail="Spine not initialized")
+        return {
+            "connectors": connector_registry.describe(),
+            "discovery_errors": connector_registry.discovery.errors,
+            "skipped": connector_registry.discovery.skipped,
+            "instantiation_errors": connector_registry.instantiation_errors,
+        }
+
+    @app.post("/api/v1/connectors/{name}/execute")
+    async def connector_execute(name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """Execute one tool on a discovered connector."""
+        if connector_registry is None:
+            raise HTTPException(status_code=503, detail="Spine not initialized")
+        conn = connector_registry.get(name)
+        if conn is None:
+            raise HTTPException(status_code=404, detail=f"Unknown connector '{name}'")
+        result = conn.execute(
+            str(payload.get("tool", "")), dict(payload.get("params", {}))
+        )
+        return {
+            "connector": name,
+            "tool": result.tool,
+            "success": result.success,
+            "output": result.output,
+            "error": result.error,
+            "elapsed_ms": result.elapsed_ms,
+        }
+
+    @app.post("/mcp")
+    async def mcp_endpoint(payload: dict[str, Any]) -> Any:
+        """MCP over Streamable HTTP (stateless): one JSON-RPC message in,
+        one out. Notifications (no id) get a 202 with no body."""
+        from fastapi.responses import Response
+
+        response = build_mcp_server().handle(payload)
+        if response is None:
+            return Response(status_code=202)
+        return response
+
+    @app.get("/.well-known/agent-card.json")
+    async def agent_card() -> dict[str, Any]:
+        """A2A discovery document for agent callers."""
+        return _get_a2a_agent().card()
+
+    @app.post("/a2a")
+    async def a2a_endpoint(payload: dict[str, Any]) -> Any:
+        """A2A JSON-RPC: message/send and tasks/get over the gated cycle."""
+        from fastapi.responses import Response
+
+        response = _get_a2a_agent().handle(payload)
+        if response is None:
+            return Response(status_code=202)
+        return response
+
+    @app.get("/acp/agents")
+    async def acp_agents() -> list[dict[str, Any]]:
+        """ACP agent manifests."""
+        return [_get_acp_agent().manifest()]
+
+    @app.post("/acp/agents/{name}/runs")
+    async def acp_create_run(name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """ACP: create (and synchronously execute) a run."""
+        agent = _get_acp_agent()
+        if name != agent.manifest()["name"]:
+            raise HTTPException(status_code=404, detail=f"Unknown agent '{name}'")
+        return agent.create_run(payload)
+
+    @app.get("/acp/agents/{name}/runs/{run_id}")
+    async def acp_get_run(name: str, run_id: str) -> dict[str, Any]:
+        """ACP: read a run's status and output."""
+        agent = _get_acp_agent()
+        run = agent.runs.get(run_id)
+        if run is None or name != agent.manifest()["name"]:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return run
+
+    @app.get("/ui")
+    async def ui() -> Any:
+        """Browser UI for humans — one self-contained page over the API."""
+        from fastapi.responses import HTMLResponse
+
+        from spine.webui import UI_HTML
+
+        return HTMLResponse(content=UI_HTML)
+
     @app.get("/api/v1/telemetry")
     async def telemetry_endpoint() -> dict[str, Any]:
         """Aggregated telemetry: provider latency, usage, convergence metrics."""
@@ -308,7 +780,6 @@ def create_app() -> FastAPI:
         if ctst_ledger is not None:
             records = ctst_ledger.read()
             for r in records:
-                # We store ProviderResult dict via r.to_dict(); parse telemetry
                 data = r.to_dict()
                 t = data.get("telemetry", {})
                 p = data.get("mechanism", "unknown")
@@ -323,8 +794,9 @@ def create_app() -> FastAPI:
                 for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
                     if k in t and t[k] is not None:
                         telemetry_by_provider[p][k].append(t[k])
-                if "error_signal" in t:
-                    telemetry_by_provider[p]["error_signals"].append(t["error_signal"])
+                # The authoritative error signal is the record's own field,
+                # set by the gated cycle — not a copy inside telemetry.
+                telemetry_by_provider[p]["error_signals"].append(r.error_signal)
                 telemetry_by_provider[p]["count"] += 1
 
         # Compute aggregates
@@ -335,16 +807,20 @@ def create_app() -> FastAPI:
         for provider, metrics in telemetry_by_provider.items():
             cs = metrics["count"]
             agg["providers"][provider] = {
-                "prompt_tokens_avg": sum(metrics["prompt_tokens"]) / cs
+                "prompt_tokens_avg": sum(metrics["prompt_tokens"])
+                / len(metrics["prompt_tokens"])
                 if metrics["prompt_tokens"]
                 else 0,
-                "completion_tokens_avg": sum(metrics["completion_tokens"]) / cs
+                "completion_tokens_avg": sum(metrics["completion_tokens"])
+                / len(metrics["completion_tokens"])
                 if metrics["completion_tokens"]
                 else 0,
-                "total_tokens_avg": sum(metrics["total_tokens"]) / cs
+                "total_tokens_avg": sum(metrics["total_tokens"])
+                / len(metrics["total_tokens"])
                 if metrics["total_tokens"]
                 else 0,
-                "avg_error_signal": sum(metrics["error_signals"]) / cs
+                "avg_error_signal": sum(metrics["error_signals"])
+                / len(metrics["error_signals"])
                 if metrics["error_signals"]
                 else 0,
                 "runs": cs,

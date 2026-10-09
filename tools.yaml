@@ -1,0 +1,37 @@
+# TransformationSpine tool registry definitions.
+#
+# Each entry binds an OpenAI-format tool definition to a built-in
+# executor in spine.tools.BUILTIN_TOOLS. Tools are deliberately small
+# and safe (no filesystem, no shell, no network): anything that touches
+# the outside world belongs in a connector, behind its own credentials.
+# The API loads this file at startup (SPINE_TOOLS_PATH overrides the
+# location); a missing file falls back to the built-in defaults.
+
+tools:
+  - name: echo
+    builtin: echo
+    description: "Echo the given text back verbatim."
+    parameters:
+      type: object
+      properties:
+        text:
+          type: string
+      required: [text]
+
+  - name: current_time
+    builtin: current_time
+    description: "Return the current UTC time as an ISO-8601 string."
+    parameters:
+      type: object
+      properties: {}
+
+  - name: calculator
+    builtin: calculator
+    description: "Evaluate a numeric arithmetic expression (+, -, *, /, %, **) and return the result."
+    parameters:
+      type: object
+      properties:
+        expression:
+          type: string
+          description: "Arithmetic expression, e.g. '2 * (3 + 4)'"
+      required: [expression]

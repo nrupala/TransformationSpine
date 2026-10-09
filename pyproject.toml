@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "transformation-spine"
-version = "0.1.0"
+version = "0.2.0"
 description = "Provider-neutral transformation spine: context lifecycle, provider abstraction, and outcome convergence."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -33,6 +33,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
     "ruff>=0.6",
     "mypy>=1.10",
 ]
