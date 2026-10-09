@@ -11,11 +11,41 @@ control plane, not the stochastic plant.
 
 from __future__ import annotations
 
+import json
+import os
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
 
 from .context import SCOPE_POLICIES, ContextFact, ContextScope
 
 _SCOPES_BY_RANK: list[ContextScope] = sorted(ContextScope, key=lambda s: s.rank)
+
+
+def _fact_to_dict(fact: ContextFact) -> dict[str, Any]:
+    return {
+        "key": fact.key,
+        "value": fact.value,
+        "scope": fact.scope.value,
+        "origin": fact.origin,
+        "owner": fact.owner,
+        "created_at": fact.created_at.isoformat(),
+        "last_accessed": fact.last_accessed.isoformat(),
+        "id": fact.id,
+    }
+
+
+def _fact_from_dict(data: dict[str, Any]) -> ContextFact:
+    return ContextFact(
+        key=data["key"],
+        value=data.get("value"),
+        scope=ContextScope(data["scope"]),
+        origin=data.get("origin", ""),
+        owner=data.get("owner", ""),
+        created_at=datetime.fromisoformat(data["created_at"]),
+        last_accessed=datetime.fromisoformat(data["last_accessed"]),
+        id=data.get("id", ""),
+    )
 
 
 class ScopeViolationError(ValueError):
@@ -30,9 +60,51 @@ class ContextStore:
     PERSISTENT derived summary remains).
     """
 
-    def __init__(self) -> None:
+    def __init__(self, path: str | Path | None = None) -> None:
+        """Create a store.
+
+        ``path`` is an optional durable backing file. When given (or when
+        the SPINE_CONTEXT_PATH env var is set), facts in scopes whose
+        policy persists (SESSION, PROJECT, PERSISTENT) are written through
+        to that file on every mutation and reloaded on construction, so
+        they survive process restarts. TRANSIENT facts are never written.
+        Durable facts should carry JSON-serializable values; other values
+        are stored via ``str()`` fallback and reload as strings.
+        With no path, the store is purely in-memory (the historical
+        behavior, still what most unit tests want).
+        """
         self._facts: dict[tuple[str, ContextScope, str], ContextFact] = {}
         self._session_open: set[str] = set()
+        if path is None:
+            env_path = os.environ.get("SPINE_CONTEXT_PATH")
+            path = Path(env_path) if env_path else None
+        self._path: Path | None = Path(path) if path is not None else None
+        if self._path is not None:
+            self._load()
+
+    # -- Durable backing ----------------------------------------------------
+
+    def _load(self) -> None:
+        if self._path is None or not self._path.exists():
+            return
+        data = json.loads(self._path.read_text(encoding="utf-8"))
+        for item in data.get("facts", []):
+            fact = _fact_from_dict(item)
+            self._facts[(fact.key, fact.scope, fact.owner)] = fact
+
+    def _save(self) -> None:
+        if self._path is None:
+            return
+        facts = [
+            _fact_to_dict(f)
+            for f in self._facts.values()
+            if SCOPE_POLICIES[f.scope].persists
+        ]
+        payload = json.dumps({"facts": facts}, indent=1, default=str)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self._path.with_suffix(self._path.suffix + ".tmp")
+        tmp.write_text(payload, encoding="utf-8")
+        tmp.replace(self._path)  # atomic rename: no torn writes
 
     # -- Reads ----------------------------------------------------------------
 
@@ -48,6 +120,7 @@ class ContextStore:
             return None
         if fact.is_expired():
             del self._facts[(key, scope, owner)]
+            self._save()
             return None
         fact.touch()
         return fact
@@ -109,17 +182,25 @@ class ContextStore:
             # transient facts may override nothing persistent; they are shadowed.
             pass
         self._facts[key] = fact
+        self._save()
         return fact
 
     # -- Lifecycle -------------------------------------------------------------
 
     def promote(self, fact: ContextFact, owner: str = "") -> ContextFact:
-        """Move a fact one durability level up (e.g. SESSION -> PROJECT).
+        """Create a hardened successor one durability level up.
 
         Promotion is the spine's explicit act of *hardening* knowledge:
         a fact proven by passing tests (SESSION) becomes a durable decision
         (PROJECT). Only one level per call — crossing two levels would
         shortcut the governance review that promotion implies.
+
+        Semantics (by design, and tested): the successor *coexists* with
+        the original, which remains at its own scope until consolidation
+        or retirement removes it — the same fact may legitimately live at
+        several scopes. Provenance is preserved: the successor keeps the
+        original's origin chain (with this transition appended) and its
+        original creation time, rather than appearing from nowhere.
         """
         if fact.scope is ContextScope.PERSISTENT or not fact.scope.can_promote_to(
             _SCOPES_BY_RANK[fact.scope.rank + 1]
@@ -128,41 +209,48 @@ class ContextStore:
                 f"Cannot promote {fact.scope.value} to a higher scope"
             )
         target = _SCOPES_BY_RANK[fact.scope.rank + 1]
+        transition = f"promoted_from:{fact.scope.value}"
         promoted = ContextFact(
             key=fact.key,
             value=fact.value,
             scope=target,
-            origin=f"promoted_from:{fact.scope.value}",
+            origin=f"{fact.origin}|{transition}" if fact.origin else transition,
             owner=owner or fact.owner,
-            created_at=datetime.now(UTC),
+            created_at=fact.created_at,
         )
         self._facts[(promoted.key, target, promoted.owner)] = promoted
+        self._save()
         return promoted
 
     def demote(self, fact: ContextFact, owner: str = "") -> ContextFact:
-        """Move a fact one durability level down (e.g. PROJECT -> SESSION).
+        """Create a successor one durability level down (PROJECT -> SESSION).
 
         Demotion marks knowledge as *no longer authoritative* without
         deleting it; history remains in the decision log, and the fact may
-        still be consulted at the lower scope.
+        still be consulted at the lower scope. Like promote(), the
+        successor coexists with the original and preserves its provenance
+        chain and creation time.
         """
         if fact.scope.rank <= ContextScope.TRANSIENT.rank:
             raise ScopeViolationError("Cannot demote below TRANSIENT")
         target = _SCOPES_BY_RANK[fact.scope.rank - 1]
+        transition = f"demoted_from:{fact.scope.value}"
         demoted = ContextFact(
             key=fact.key,
             value=fact.value,
             scope=target,
-            origin=f"demoted_from:{fact.scope.value}",
+            origin=f"{fact.origin}|{transition}" if fact.origin else transition,
             owner=owner or fact.owner,
-            created_at=datetime.now(UTC),
+            created_at=fact.created_at,
         )
         self._facts[(demoted.key, target, demoted.owner)] = demoted
+        self._save()
         return demoted
 
     def expire(self, key: str, scope: ContextScope, owner: str = "") -> None:
         """Remove a fact outright (the store-local equivalent of retirement)."""
         self._facts.pop((key, scope, owner), None)
+        self._save()
 
     def consolidate_session(
         self,
@@ -191,6 +279,7 @@ class ContextStore:
             self.promote(fact, owner=session_id)
             promoted_count += 1
         self._session_open.discard(session_id)
+        self._save()
         return promoted_count
 
     def open_session(self, session_id: str) -> None:
@@ -211,6 +300,8 @@ class ContextStore:
         ]
         for key in stale:
             del self._facts[key]
+        if stale:
+            self._save()
 
     def __len__(self) -> int:
         self._expire_all()

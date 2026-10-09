@@ -41,7 +41,9 @@ def test_promotion_moves_one_level_and_hardens() -> None:
     store.put(fact)
     promoted = store.promote(fact, owner="s1")
     assert promoted.scope is ContextScope.PROJECT
-    assert promoted.origin == "promoted_from:session"
+    # Provenance is preserved: original origin kept, transition appended.
+    assert promoted.origin == "test:proven.result|promoted_from:session"
+    assert promoted.created_at == fact.created_at
     # original session fact still exists until consolidated
     assert store.get("proven.result", ContextScope.SESSION, "s1") is not None
 
