@@ -26,6 +26,9 @@ after the claim audit and remediation (see CHANGELOG).
 
 ## Next
 
+- ~~Plugin-based connector auto-discovery~~ — shipped in the
+  post-0.2.0 stack (entry points + directory plugins + registry).
+
 - Composition with AxiomSpine and SpineLink (spine-stack): one
   context owner across the stack; TransformationSpine owns context and
   provider selection, AxiomSpine stays the dispatch/verification

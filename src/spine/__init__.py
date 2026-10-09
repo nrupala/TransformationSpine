@@ -34,6 +34,7 @@ from .context import (
     declare,
 )
 from .ctst import CTSTLedger, CTSTRecord
+from .discovery import ConnectorRegistry, DiscoveryResult, discover_connectors
 from .factory import (
     build_provider_map,
     canonical_provider,
@@ -78,6 +79,9 @@ __all__ = [
     "CTSTRecord",
     "CTSTLedger",
     "build_provider_map",
+    "ConnectorRegistry",
+    "DiscoveryResult",
+    "discover_connectors",
     "canonical_provider",
     "parse_provider_specs",
     "select_for_task",

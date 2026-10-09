@@ -44,6 +44,7 @@ store: Any = None  # ContextStore — initialized in lifespan
 ctst_ledger: Any = None  # CTSTLedger — initialized in lifespan
 provider_map: dict[str, Any] = {}  # name → Provider instance
 tool_registry: Any = None  # ToolRegistry — initialized in lifespan
+connector_registry: Any = None  # ConnectorRegistry — initialized in lifespan
 
 
 # ── Helper functions ─────────────────────────────────────────────────
@@ -141,7 +142,7 @@ def _run_gated_cycle(
 
 @asynccontextmanager
 async def lifespan(app: Any) -> Any:
-    global store, ctst_ledger, provider_map, tool_registry
+    global store, ctst_ledger, provider_map, tool_registry, connector_registry
 
     # Import the package modules after app starts to avoid circular deps
     from spine.ctst import CTSTLedger  # noqa: F811
@@ -165,6 +166,13 @@ async def lifespan(app: Any) -> Any:
         tool_registry = ToolRegistry.from_yaml(tools_path)
     else:
         tool_registry = ToolRegistry.defaults()
+
+    # Connector registry: built-ins + entry-point plugins + directory
+    # plugins (SPINE_CONNECTOR_PATH / ./connectors). Discovery never
+    # raises; broken plugins are reported, not fatal.
+    from spine.discovery import ConnectorRegistry
+
+    connector_registry = ConnectorRegistry.discover()
 
     # Register providers for the active profile (SPINE_PROFILE env,
     # default "local") from Providers.yaml via the factory, when the
@@ -209,6 +217,7 @@ async def lifespan(app: Any) -> Any:
         store = None
         ctst_ledger = None
         tool_registry = None
+        connector_registry = None
         provider_map.clear()
         return
     try:
@@ -263,6 +272,7 @@ async def lifespan(app: Any) -> Any:
     store = None
     ctst_ledger = None
     tool_registry = None
+    connector_registry = None
     provider_map.clear()
 
 
@@ -340,6 +350,7 @@ def create_app() -> FastAPI:
                 "world_writable_files": world_writable,
             },
             "tools": tool_registry.names() if tool_registry else [],
+            "connectors": connector_registry.names() if connector_registry else [],
         }
 
     @app.get("/api/v1/context")  # noqa: F821
@@ -517,6 +528,42 @@ def create_app() -> FastAPI:
             "valid": ctst_ledger.verify_chain(),
             "head_hash": ctst_ledger.head_hash,
             "records": len(ctst_ledger.query()),
+        }
+
+    @app.get("/api/v1/connectors")
+    async def connectors() -> dict[str, Any]:
+        """Discovered connectors (built-in + plugins) and their tools."""
+        if connector_registry is None:
+            raise HTTPException(status_code=503, detail="Spine not initialized")
+        return {
+            "connectors": connector_registry.describe(),
+            "discovery_errors": connector_registry.discovery.errors,
+            "skipped": connector_registry.discovery.skipped,
+            "instantiation_errors": connector_registry.instantiation_errors,
+        }
+
+    @app.post("/api/v1/connectors/{name}/execute")
+    async def connector_execute(
+        name: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Execute one tool on a discovered connector."""
+        if connector_registry is None:
+            raise HTTPException(status_code=503, detail="Spine not initialized")
+        conn = connector_registry.get(name)
+        if conn is None:
+            raise HTTPException(
+                status_code=404, detail=f"Unknown connector '{name}'"
+            )
+        result = conn.execute(
+            str(payload.get("tool", "")), dict(payload.get("params", {}))
+        )
+        return {
+            "connector": name,
+            "tool": result.tool,
+            "success": result.success,
+            "output": result.output,
+            "error": result.error,
+            "elapsed_ms": result.elapsed_ms,
         }
 
     @app.get("/api/v1/telemetry")
