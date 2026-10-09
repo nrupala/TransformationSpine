@@ -4,35 +4,7 @@ All notable changes to Transformation Spine are recorded here.
 
 ## [Unreleased]
 
-### Added
-
-- **Connector plugin auto-discovery** — the 0.2.0 note below ("plugin
-  auto-discovery was planned but is not implemented") is superseded:
-  connectors now register three ways into one registry — built-ins,
-  the `spine.connectors` entry-point group (any installed
-  distribution), and plugin directories (`SPINE_CONNECTOR_PATH` env
-  var or a local `connectors/` directory). Broken plugins are
-  reported and skipped, never fatal. Configuration is uniform:
-  `SPINE_CONNECTOR_<NAME>_<PARAM>` env vars feed constructor params.
-  Surfaces: `GET /api/v1/connectors`,
-  `POST /api/v1/connectors/{name}/execute`,
-  `spine connector list|execute`.
-- **MCP server surface** — `POST /mcp` (Streamable HTTP, stateless)
-  and `spine mcp` (stdio). Tools: `spine_transform`, `spine_status`,
-  `spine_context`, `spine_ledger_verify`, `spine_connector_execute`,
-  one per connector capability (`<connector>__<tool>`), built-ins.
-- **A2A + ACP agent surfaces and a browser UI** — A2A agent card at
-  `/.well-known/agent-card.json`, JSON-RPC `message/send`/`tasks/get`
-  at `POST /a2a`; ACP `GET /acp/agents`,
-  `POST /acp/agents/{name}/runs`, `GET .../runs/{id}`; humans get
-  `GET /ui`. Every surface runs the one gated cycle
-  (`docs/serving.md` maps them all).
-
-### Changed
-
-- **portledger at 100% coverage** (was 61%; repo total ~83%).
-- `scripts/safeguard.sh` is committed executable (mode 100755); the
-  original API-based push could not set the exec bit.
+(empty)
 
 ## [0.2.0] - 2026-10-09
 
@@ -48,7 +20,7 @@ All notable changes to Transformation Spine are recorded here.
 - `ServiceNowConnector` — incident, change, CMDB, service catalog
 - `DatabricksConnector` — SQL endpoints, MLflow, workspace objects
 - `ConfluenceConnector` — pages, spaces, attachments
-- All six connectors exported from the package and covered by mock-transport tests (plugin auto-discovery was planned but is not implemented; connectors register by import)
+- All six connectors exported from the package and covered by mock-transport tests (plugin auto-discovery is implemented in this release; connectors register by discovery as well as import)
 
 #### Audit logs & telemetry (Phase 3)
 - `ProviderResult.telemetry` dict for prompt/token/latency metrics
@@ -125,8 +97,34 @@ claim; this release contains the remediation, each fix behavior-tested:
   headers on all sources, local adapters ignore proxy env
   (`trust_env=False`), missing promised docs/files restored.
 
+### Added — serving surfaces and plugin discovery (2026-10-09)
+
+- **Connector plugin auto-discovery** — implemented in this release:
+  connectors now register three ways into one registry — built-ins,
+  the `spine.connectors` entry-point group (any installed
+  distribution), and plugin directories (`SPINE_CONNECTOR_PATH` env
+  var or a local `connectors/` directory). Broken plugins are
+  reported and skipped, never fatal. Configuration is uniform:
+  `SPINE_CONNECTOR_<NAME>_<PARAM>` env vars feed constructor params.
+  Surfaces: `GET /api/v1/connectors`,
+  `POST /api/v1/connectors/{name}/execute`,
+  `spine connector list|execute`.
+- **MCP server surface** — `POST /mcp` (Streamable HTTP, stateless)
+  and `spine mcp` (stdio). Tools: `spine_transform`, `spine_status`,
+  `spine_context`, `spine_ledger_verify`, `spine_connector_execute`,
+  one per connector capability (`<connector>__<tool>`), built-ins.
+- **A2A + ACP agent surfaces and a browser UI** — A2A agent card at
+  `/.well-known/agent-card.json`, JSON-RPC `message/send`/`tasks/get`
+  at `POST /a2a`; ACP `GET /acp/agents`,
+  `POST /acp/agents/{name}/runs`, `GET .../runs/{id}`; humans get
+  `GET /ui`. Every surface runs the one gated cycle
+  (`docs/serving.md` maps them all).
+
 ### Changed
 - All phases maintain ASF gate compliance (G0-G8) with recorded evidence
+- **portledger at 100% coverage** (was 61%; repo total ~83%).
+- `scripts/safeguard.sh` is committed executable (mode 100755); the
+  original API-based push could not set the exec bit.
 - Zero breaking changes to v0.1.0 public interfaces
 - Build plan follows phased approach with verified exit conditions per phase
 
