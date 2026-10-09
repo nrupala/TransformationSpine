@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """portledger to full coverage (owner directive: 100%).
 
 The pre-existing test_portledger.py covered the happy paths (~61%).

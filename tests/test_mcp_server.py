@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """MCP server surface tests: JSON-RPC handler, stdio, HTTP transport."""
 
 from __future__ import annotations

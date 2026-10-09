@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # OS-Level Safeguarding
 
 This document describes how TransformationSpine implements OS-level file access controls to ensure the spine process operates with least-privilege security.

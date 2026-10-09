@@ -8,6 +8,9 @@ tags: [test-generation, agents, spine, pytest]
 location: skills/test-generator-agent/SKILL.md
 ---
 
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # Test Generator Agent
 
 Generates syntactically valid pytest tests for TransformationSpine

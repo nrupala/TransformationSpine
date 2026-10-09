@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Adapters
 
 Provider adapters live in `src/spine/adapters.py`. Every adapter

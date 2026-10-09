@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # User_Profile.example.yaml
 # Copy to `User_Profile.yaml` (ignored by git) and fill in for your machine.
 # The spine loads user preferences before routing/answering.

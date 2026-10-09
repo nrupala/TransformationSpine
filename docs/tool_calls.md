@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Tool-Call Abstraction
 
 TransformationSpine supports OpenAI-style function calling via the `tool_calls` field on `ProviderResult`. This enables the spine to orchestrate multi-step workflows where the model can request external tool execution.

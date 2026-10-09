@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Connector tests for the Phase-2 connectors (audit F-02).
 
 The connectors are real HTTP clients; these tests drive them with a

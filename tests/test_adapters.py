@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Adapter tests (BUILD_PLAN Phase 1 promised this file; audit F-05).
 
 Drives the HuggingFace provider against an httpx MockTransport: the

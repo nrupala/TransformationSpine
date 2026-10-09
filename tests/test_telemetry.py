@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Telemetry endpoint tests for TransformationSpine.
 
 Tests the GET /api/v1/telemetry aggregated metrics endpoint

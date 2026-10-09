@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Provider factory / profile routing tests (audit F-06).
 
 Before the fix: Providers.yaml's nested cloud/hybrid sections were
