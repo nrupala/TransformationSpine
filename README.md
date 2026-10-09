@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Transformation Spine
 
 Provider-neutral transformation platform. Models are workers; the spine owns

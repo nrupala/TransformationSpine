@@ -8,6 +8,9 @@ tags: [prompt-optimization, agents, spine, optimization]
 location: skills/prompt-optimizer-agent/SKILL.md
 ---
 
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # Prompt Optimizer Agent
 
 Optimizes prompt templates for TransformationSpine provider calls.

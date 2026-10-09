@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Example Providers.yaml — copy to Providers.yaml and edit.
 # Profiles group providers; spine.factory builds the active profile's
 # adapters (SPINE_PROFILE env or the CLI --profile flag selects it).

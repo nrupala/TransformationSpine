@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """ContextStore durable-backing tests (audit F-14 regression suite).
 
 Before the fix the store was a pure in-memory dict: facts in scopes the

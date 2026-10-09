@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OS-level safeguarding tests for TransformationSpine."""
 
 from __future__ import annotations

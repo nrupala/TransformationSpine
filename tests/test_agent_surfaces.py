@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Agent + human surface tests: A2A, ACP, and the browser UI.
 
 Every surface must run the same gated cycle: these tests drive A2A

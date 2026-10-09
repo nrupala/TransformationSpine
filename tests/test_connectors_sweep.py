@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Connector sweep: every declared tool on every connector, driven
 through the mocked httpx layer (audit F-11 coverage + F-02 contract).
 

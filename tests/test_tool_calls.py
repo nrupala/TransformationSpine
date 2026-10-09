@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tool-call abstraction tests for TransformationSpine.
 
 Tests that ProviderResult supports tool_calls and that adapters

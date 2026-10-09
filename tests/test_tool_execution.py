@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tool execution loop tests (audit F-10).
 
 Before the fix, adapters parsed tool_calls and nothing executed them.
