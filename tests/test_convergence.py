@@ -136,10 +136,10 @@ def test_provider_swap_loses_nothing_contextually() -> None:
     is handed to the new engine unchanged.
     """
     store = ContextStore()
-    store.put(declare("decision.routing", "coding->anthropic/sonnet",
-                      ContextScope.PERSISTENT))
-    store.put(declare("decision.provider-neutral", "accepted",
-                      ContextScope.PROJECT))
+    store.put(
+        declare("decision.routing", "coding->anthropic/sonnet", ContextScope.PERSISTENT)
+    )
+    store.put(declare("decision.provider-neutral", "accepted", ContextScope.PROJECT))
 
     facts = store.visible_to(ContextScope.SESSION)
     rendered = {f.key: f.value for f in facts}
@@ -155,17 +155,22 @@ def test_fake_provider_complies_with_provider_protocol() -> None:
     assert isinstance(FakeProvider(name="p"), Provider)
 
 
-
 def test_routing_rules_and_model_specs_from_yaml_shape() -> None:
     """The typed config layer parses the repo's YAML shapes without losing fields."""
     from spine.provider import ModelSpec, RouterRule
 
     providers_cfg = {
         "providers": {
-            "anthropic": {"endpoint": "https://api.anthropic.com/v1",
-                          "models": ["sonnet"], "strengths": ["coding"]},
-            "ollama": {"endpoint": "http://localhost:11434",
-                       "models": ["deepseek"], "strengths": ["local workloads"]},
+            "anthropic": {
+                "endpoint": "https://api.anthropic.com/v1",
+                "models": ["sonnet"],
+                "strengths": ["coding"],
+            },
+            "ollama": {
+                "endpoint": "http://localhost:11434",
+                "models": ["deepseek"],
+                "strengths": ["local workloads"],
+            },
         }
     }
     specs = ModelSpec.from_yaml(providers_cfg)

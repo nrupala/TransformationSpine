@@ -87,7 +87,8 @@ def test_assembly_summary_tier_is_capped_and_headed() -> None:
 
 
 def test_transform_response_carries_token_plan(
-    tmp_path, monkeypatch  # type: ignore[no-untyped-def]
+    tmp_path,
+    monkeypatch,  # type: ignore[no-untyped-def]
 ) -> None:
     from fastapi.testclient import TestClient
 
@@ -135,13 +136,9 @@ def test_compact_session_checkpoint() -> None:
     assert summary.key == "session-summary:s1"
     assert summary.origin.startswith("compacted:3:from:")
     # The folded facts are gone; only the checkpoint remains.
-    remaining = [
-        f for f in store.query(scope=ContextScope.SESSION, owner="s1")
-    ]
+    remaining = [f for f in store.query(scope=ContextScope.SESSION, owner="s1")]
     assert [f.key for f in remaining] == ["session-summary:s1"]
     assert store.session_summary("s1") is summary
     # And the checkpoint flows into assembly's summary tier.
-    a = assemble_context(
-        [], summary=str(summary.value), summary_covers=3
-    )
+    a = assemble_context([], summary=str(summary.value), summary_covers=3)
     assert "covers 3 facts" in a.text

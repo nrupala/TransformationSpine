@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """TransformationSpine package.
 
 Provider-neutral, context-lifecycle-driven orchestration spine. Models are
@@ -110,4 +112,4 @@ __all__ = [
     "verify_write_protection",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

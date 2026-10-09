@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 # Vendored from D:\research\port-ledger (PortLedger v0.1.0, tag v0.1.0).
 # Source of record: D:\research\port-ledger\portledger.py — keep in sync there.
 # License: Apache-2.0. Stdlib-only.
@@ -25,6 +27,7 @@ CLI
     python -m portledger --status
     python -m portledger --resolve-used            # who occupies a port (netstat)
 """
+
 from __future__ import annotations
 
 import argparse
@@ -38,9 +41,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 DEFAULT_LEDGER = Path.home() / ".portledger" / "ledger.jsonl"
-DEFAULT_STATE   = Path.home() / ".portledger" / "ports.current.json"
-MIN_RANDOM      = 1024
-MAX_RANDOM      = 65535
+DEFAULT_STATE = Path.home() / ".portledger" / "ports.current.json"
+MIN_RANDOM = 1024
+MAX_RANDOM = 65535
 
 # Single source of truth for the package version (semver, see CHANGELOG.md).
 # pyproject.toml `version` MUST match this value.
@@ -201,7 +204,9 @@ class PortLedger:
 
 def _cli() -> None:
     ap = argparse.ArgumentParser(prog="portledger", description=__doc__)
-    ap.add_argument("--version", "-V", action="store_true", help="print version and exit")  # noqa: E501
+    ap.add_argument(
+        "--version", "-V", action="store_true", help="print version and exit"
+    )  # noqa: E501
     ap.add_argument("--service", "-s", help="service name, e.g. aioa")
     ap.add_argument("--preferred", type=int, default=11199, help="preferred port")
     ap.add_argument("--range", default=None, help="scan range lo-hi, e.g. 11190-11210")

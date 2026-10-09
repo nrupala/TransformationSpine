@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Agent invocation adapters for prebuilt agent skills."""
 
 from __future__ import annotations
@@ -124,9 +126,7 @@ def list_agent_skills() -> list[str]:
     if root is None:
         return []
     return sorted(
-        d.name
-        for d in root.iterdir()
-        if d.is_dir() and (d / "SKILL.md").exists()
+        d.name for d in root.iterdir() if d.is_dir() and (d / "SKILL.md").exists()
     )
 
 
@@ -151,9 +151,7 @@ def code_review(path: str) -> AgentResult:
             if result.stdout:
                 output_parts.append(result.stdout)
             if result.returncode != 0:
-                errors.extend(
-                    (result.stderr or result.stdout).splitlines()
-                )
+                errors.extend((result.stderr or result.stdout).splitlines())
         except subprocess.TimeoutExpired:
             errors.append(f"{tool} timed out")
 
@@ -199,7 +197,7 @@ def _generate_test_content(mod: Path) -> str:
         "",
         "",
         "def test_module_exists() -> None:",
-        f'    assert {module_name} is not None',
+        f"    assert {module_name} is not None",
     ]
     for node in tree.body:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
@@ -212,7 +210,6 @@ def _generate_test_content(mod: Path) -> str:
                 f"    assert callable({module_name}.{node.name})",
             ]
     return "\n".join(lines) + "\n"
-
 
 
 _FILLER_PHRASES = (
@@ -244,7 +241,7 @@ def prompt_optimizer(prompt: str) -> AgentResult:
         # case-insensitive removal of the phrase wherever it appears
         idx = text.lower().find(phrase)
         while idx != -1:
-            text = text[:idx] + text[idx + len(phrase):]
+            text = text[:idx] + text[idx + len(phrase) :]
             idx = text.lower().find(phrase)
     lines = [line.strip() for line in text.splitlines()]
     compacted: list[str] = []
@@ -269,9 +266,7 @@ def prompt_optimizer(prompt: str) -> AgentResult:
     )
 
 
-def rag_query(
-    documents: list[str], query: str, k: int = 3
-) -> AgentResult:
+def rag_query(documents: list[str], query: str, k: int = 3) -> AgentResult:
     """Retrieve the top-k documents for a query (rag-pipeline-agent).
 
     Lexical retrieval — token-overlap (Jaccard) scoring over the given
@@ -290,9 +285,7 @@ def rag_query(
             scored.append((score, idx, doc))
     scored.sort(key=lambda t: (-t[0], t[1]))
     top = scored[:k]
-    output = "\n\n".join(
-        f"[score={score:.3f}] {doc}" for score, _idx, doc in top
-    )
+    output = "\n\n".join(f"[score={score:.3f}] {doc}" for score, _idx, doc in top)
     return AgentResult(
         success=True,
         output=output,

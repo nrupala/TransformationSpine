@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Token planner + route registry — the spine's token-efficiency engine.
 
 Ported from the Token-Efficiency Engine spec (ENGINE-SPEC-v1) that runs

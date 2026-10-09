@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Tool registry and execution loop — tool calls that actually run.
 
 Audit F-10: adapters parsed ``tool_calls`` out of provider responses
@@ -105,8 +107,7 @@ class ToolRegistry:
             "function": {
                 "name": name,
                 "description": description,
-                "parameters": parameters
-                or {"type": "object", "properties": {}},
+                "parameters": parameters or {"type": "object", "properties": {}},
             },
         }
 
@@ -219,8 +220,7 @@ def run_tool_loop(
             outcome = registry.execute(name, args)
             executions.append(outcome)
             lines.append(
-                f"Tool {name} result: "
-                f"{outcome.get('output', outcome.get('error'))}"
+                f"Tool {name} result: {outcome.get('output', outcome.get('error'))}"
             )
         follow_up = (
             f"{prompt}\n\n" + "\n".join(lines) + "\n\nNow answer the original "

@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Provider factory — profiles and routing that actually take effect.
 
 Audit F-06: Providers.yaml / Routing.yaml existed and RouterRule could
@@ -40,9 +42,7 @@ def canonical_provider(name: str) -> str:
     return _PROVIDER_ALIASES.get(name.lower(), name.lower())
 
 
-def _specs_from_section(
-    provider_label: str, cfg: dict[str, Any]
-) -> list[ModelSpec]:
+def _specs_from_section(provider_label: str, cfg: dict[str, Any]) -> list[ModelSpec]:
     specs: list[ModelSpec] = []
     endpoint = cfg.get("endpoint", "")
     strengths = tuple(cfg.get("strengths", []))
@@ -150,9 +150,7 @@ def build_provider_map(
     return result
 
 
-def select_for_task(
-    rules: list[RouterRule], task: str
-) -> RouterRule | None:
+def select_for_task(rules: list[RouterRule], task: str) -> RouterRule | None:
     """Resolve the routing rule for a task kind (exact match)."""
     for rule in rules:
         if rule.matches(task):

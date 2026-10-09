@@ -38,12 +38,14 @@ def _patch(
 ) -> dict[str, Any]:
     calls: dict[str, Any] = {"get": [], "post": []}
     if get is not None:
+
         def _get(url: str, **kw: Any) -> Any:
             calls["get"].append((url, kw))
             return get(url, **kw)
 
         monkeypatch.setattr(httpx, "get", _get)
     if post is not None:
+
         def _post(url: str, **kw: Any) -> Any:
             calls["post"].append((url, kw))
             return post(url, **kw)

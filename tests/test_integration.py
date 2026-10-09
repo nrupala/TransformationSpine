@@ -191,7 +191,9 @@ def test_providers_compliance_with_protocol() -> None:
     mock_transport = build_mock_transport()
     for cls in (LlamaCppProvider, OpenAIProvider, OllamaProvider):
         provider = cls(endpoint="http://mock.test/v1")
-        provider.client = httpx.Client(transport=mock_transport, base_url="http://mock.test/v1")
+        provider.client = httpx.Client(
+            transport=mock_transport, base_url="http://mock.test/v1"
+        )
         assert isinstance(provider, Provider), (
             f"{cls.__name__} does not satisfy Provider protocol"
         )
@@ -226,7 +228,10 @@ def test_convergence_cycle_with_mock_providers() -> None:
             ("llama.cpp_big", big),
         ]:
             fact = declare(
-                "commitment.output", target, ContextScope.PERSISTENT, origin="user",
+                "commitment.output",
+                target,
+                ContextScope.PERSISTENT,
+                origin="user",
             )
             context = [fact]
 

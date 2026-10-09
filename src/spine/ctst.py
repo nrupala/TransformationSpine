@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 r"""CTST ledger — Context-Tracked State Transition durable journal.
 
 Ported from the OCS repos' concepts (D:\ocs-software, D:\ocscoder) but
@@ -209,9 +211,13 @@ class CTSTLedger:
         """Query ledger with filters. Reads all files and filters."""
         records: list[CTSTRecord] = []
         for file_path in sorted(self.root.glob("ctst_*.jsonl")):
-            records.extend(self.read(date=datetime.strptime(
-                file_path.stem.replace("ctst_", ""), "%Y-%m-%d"
-            )))
+            records.extend(
+                self.read(
+                    date=datetime.strptime(
+                        file_path.stem.replace("ctst_", ""), "%Y-%m-%d"
+                    )
+                )
+            )
 
         if mechanism:
             records = [r for r in records if r.mechanism == mechanism]
@@ -255,9 +261,13 @@ class CTSTLedger:
         """Return the full lineage chain for a record (parents → child)."""
         all_records = []
         for file_path in sorted(self.root.glob("ctst_*.jsonl")):
-            all_records.extend(self.read(date=datetime.strptime(
-                file_path.stem.replace("ctst_", ""), "%Y-%m-%d"
-            )))
+            all_records.extend(
+                self.read(
+                    date=datetime.strptime(
+                        file_path.stem.replace("ctst_", ""), "%Y-%m-%d"
+                    )
+                )
+            )
 
         by_id: dict[str, CTSTRecord] = {r.id: r for r in all_records}
         lineage: list[CTSTRecord] = []

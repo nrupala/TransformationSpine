@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """OS-level safeguarding for TransformationSpine.
 
 Ensures the spine process runs with least-privilege file access
@@ -64,9 +66,7 @@ def enforce_safeguards(
             )
 
     for dirpath, dirnames, filenames in os.walk(base):
-        dirnames[:] = [
-            d for d in dirnames if d not in ("__pycache__", ".git")
-        ]
+        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git")]
         _strip_world_write(Path(dirpath))
         for filename in filenames:
             _strip_world_write(Path(dirpath) / filename)
@@ -89,12 +89,14 @@ def audit_permissions() -> list[dict[str, Any]]:
             file_path = dir_path / filename
             if file_path.is_file():
                 stat = file_path.stat()
-                audit_results.append({
-                    "path": str(file_path),
-                    "readable": bool(stat.st_mode & 0o400),
-                    "writable": bool(stat.st_mode & 0o200),
-                    "executable": bool(stat.st_mode & 0o100),
-                })
+                audit_results.append(
+                    {
+                        "path": str(file_path),
+                        "readable": bool(stat.st_mode & 0o400),
+                        "writable": bool(stat.st_mode & 0o200),
+                        "executable": bool(stat.st_mode & 0o100),
+                    }
+                )
 
     return audit_results
 
@@ -142,8 +144,10 @@ if __name__ == "__main__":
         print(f"Audited {len(results)} files")
         for r in results[:10]:
             p = r["path"]
-            print(f"  {p}: read={r['readable']} "
-                  f"write={r['writable']} exec={r['executable']}")
+            print(
+                f"  {p}: read={r['readable']} "
+                f"write={r['writable']} exec={r['executable']}"
+            )
     else:
         print(f"Unknown command: {command}")
         sys.exit(1)

@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Workflow module — Mermaid-based graphical workflow authoring.
 
 This module complements script writing by allowing users to define workflows as
@@ -96,12 +98,12 @@ class Workflow:
 
             node_id = node.id
             node_type_str = node_type
-            lines.append(f'    {node_id}[{node_label}]')
+            lines.append(f"    {node_id}[{node_label}]")
             lines.append(
-                f'    classDef {node_type_str} fill:#e8f1ff,'
-                f'stroke:#2563eb,color:#1e3a8a'
+                f"    classDef {node_type_str} fill:#e8f1ff,"
+                f"stroke:#2563eb,color:#1e3a8a"
             )
-            lines.append(f'    class {node_id} {node_type_str}')
+            lines.append(f"    class {node_id} {node_type_str}")
 
         for edge in self.edges:
             lines.append(f"    {edge.from_node} --> {edge.to_node}")

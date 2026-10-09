@@ -96,6 +96,7 @@ def client_with_test_ledger():
         # Override the global ctst_ledger in the spine.api module
         # We need to access the module and set the global
         import spine.api as api_module
+
         api_module.ctst_ledger = test_ledger
 
         yield client
@@ -156,6 +157,7 @@ def test_telemetry_empty_ledger() -> None:
     with tempfile.TemporaryDirectory() as tmpdir:
         empty_ledger = CTSTLedger(tmpdir)
         import spine.api as api_module
+
         api_module.ctst_ledger = empty_ledger
 
         response = client.get("/api/v1/telemetry")

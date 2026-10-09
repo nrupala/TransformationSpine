@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """TransformationSpine FastAPI application.
 
 The spine API orchestrates the closed-loop control cycle:
@@ -29,7 +31,7 @@ from typing import Any
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
-from spine import ContextScope
+from spine import ContextScope, __version__
 from spine.adapters import LlamaCppProvider
 from spine.ctst import CTSTRecord
 from spine.oplog import get_logger
@@ -54,8 +56,7 @@ def _render_context(scope: Any = None) -> str:
     # Use the store's visible_to which already filters by scope
     facts = store.visible_to(scope or __import__("spine").ContextScope.SESSION)
     return "\n\n".join(
-        f"#{f.key} [{f.scope}] (origin: {f.origin or 'unknown'})"
-        f"\n{f.value}"
+        f"#{f.key} [{f.scope}] (origin: {f.origin or 'unknown'})\n{f.value}"
         for f in facts
     )
 
@@ -197,8 +198,13 @@ async def lifespan(app: Any) -> Any:
                 provider_map[name] = instance
                 oplog(op_logger, "provider registered", provider=name, profile=profile)
         except Exception as e:
-            oplog(op_logger, "profile provider load failed", level=40,
-                  profile=profile, error=str(e))
+            oplog(
+                op_logger,
+                "profile provider load failed",
+                level=40,
+                profile=profile,
+                error=str(e),
+            )
         yield
         store = None
         ctst_ledger = None
@@ -217,20 +223,34 @@ async def lifespan(app: Any) -> Any:
         models = llm_provider.list_models()
         if models:
             provider_map["llama.cpp"] = llm_provider
-            oplog(op_logger, "provider registered",
-                  provider="llama.cpp", models=len(models))
+            oplog(
+                op_logger,
+                "provider registered",
+                provider="llama.cpp",
+                models=len(models),
+            )
         else:
-            oplog(op_logger, "llama.cpp handshake: no models returned", level=30,
-                  provider="llama.cpp")
+            oplog(
+                op_logger,
+                "llama.cpp handshake: no models returned",
+                level=30,
+                provider="llama.cpp",
+            )
     except Exception as e:
-        oplog(op_logger, "could not connect to llama.cpp", level=40,
-              provider="llama.cpp", error=str(e))
+        oplog(
+            op_logger,
+            "could not connect to llama.cpp",
+            level=40,
+            provider="llama.cpp",
+            error=str(e),
+        )
 
     # Register OpenAIProvider only if OPENAI_API_KEY is set
     api_key = os.environ.get("OPENAI_API_KEY")
     if api_key:
         try:
             from spine.adapters import OpenAIProvider  # noqa: F811
+
             oa_provider = OpenAIProvider(api_key=api_key)
             provider_map["openai"] = oa_provider
             print("[spine] Registered OpenAIProvider")
@@ -253,7 +273,7 @@ def create_app() -> FastAPI:
     """Factory for the spine FastAPI application."""
     app = FastAPI(
         title="Transformation Spine API",
-        version="0.1.0",
+        version=__version__,
         description="Provider-neutral orchestration spine with outcome convergence",
         lifespan=lifespan,
     )
@@ -271,13 +291,27 @@ def create_app() -> FastAPI:
         try:
             response = await call_next(request)
         except Exception as e:
-            oplog(op_logger, "unhandled exception", level=40, request_id=rid,
-                  method=request.method, path=request.url.path, error=str(e))
+            oplog(
+                op_logger,
+                "unhandled exception",
+                level=40,
+                request_id=rid,
+                method=request.method,
+                path=request.url.path,
+                error=str(e),
+            )
             raise
         dur_ms = int((_time.time() - t0) * 1000)
         response.headers["X-Request-Id"] = rid
-        oplog(op_logger, "access", request_id=rid, method=request.method,
-              path=request.url.path, status=response.status_code, duration_ms=dur_ms)
+        oplog(
+            op_logger,
+            "access",
+            request_id=rid,
+            method=request.method,
+            path=request.url.path,
+            status=response.status_code,
+            duration_ms=dur_ms,
+        )
         return response
 
     @app.get("/api/v1/status")
@@ -336,8 +370,7 @@ def create_app() -> FastAPI:
             available = list(provider_map.keys())
             raise HTTPException(
                 status_code=400,
-                detail=f"Provider '{provider}' not available. "
-                f"Available: {available}",
+                detail=f"Provider '{provider}' not available. Available: {available}",
             )
 
         if store is None:

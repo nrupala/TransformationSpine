@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """ContextStore — the spine's memory manager.
 
 Holds every ContextFact by scope, enforces expiry, and exposes the scoping
@@ -282,9 +284,7 @@ class ContextStore:
         self._save()
         return promoted_count
 
-    def compact_session(
-        self, session_id: str, summary_text: str
-    ) -> ContextFact | None:
+    def compact_session(self, session_id: str, summary_text: str) -> ContextFact | None:
         """Fold a session's facts into one compaction-checkpoint summary.
 
         The checkpoint pattern from the Token-Efficiency Engine (MyMilo
@@ -311,9 +311,7 @@ class ContextStore:
             key=f"session-summary:{session_id}",
             value=summary_text,
             scope=ContextScope.SESSION,
-            origin=(
-                f"compacted:{len(facts)}:from:{covered_from.isoformat()}"
-            ),
+            origin=(f"compacted:{len(facts)}:from:{covered_from.isoformat()}"),
             owner=session_id,
         )
         self._facts[(summary.key, ContextScope.SESSION, session_id)] = summary
@@ -337,11 +335,7 @@ class ContextStore:
 
     def _expire_all(self) -> None:
         now = datetime.now(UTC)
-        stale = [
-            key
-            for key, fact in self._facts.items()
-            if fact.is_expired(now)
-        ]
+        stale = [key for key, fact in self._facts.items() if fact.is_expired(now)]
         for key in stale:
             del self._facts[key]
         if stale:
@@ -365,8 +359,7 @@ def snapshot_for_prompt(
     """
     facts = store.visible_to(scope, owner=owner)
     lines = [
-        f"# {f.key} [{f.scope.value}] (origin: {f.origin or 'unknown'})"
-        f"\n{f.value}"
+        f"# {f.key} [{f.scope.value}] (origin: {f.origin or 'unknown'})\n{f.value}"
         for f in facts
     ]
     if limit is not None:

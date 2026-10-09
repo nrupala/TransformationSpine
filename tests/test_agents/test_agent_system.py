@@ -43,6 +43,7 @@ def test_code_review_integration() -> None:
         assert hasattr(result, "errors")
     finally:
         import os
+
         os.unlink(fname)
 
 
@@ -61,6 +62,7 @@ def test_generate_tests_integration() -> None:
         assert "Generated tests at" in result.output
         # Check file was created
         import os
+
         assert os.path.exists(out)
         with open(out) as f:
             content = f.read()
