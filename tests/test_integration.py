@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Mock HTTP server simulating OpenAI-compatible endpoints.
 
 Used for integration-testing provider adapters without touching live

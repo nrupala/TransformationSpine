@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Gate-evaluation and end-to-end telemetry tests (audit F-03/F-07).
 
 F-03: before the fix, the gated cycle trusted the adapter's binary

@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Serving surfaces — agents, humans, programs
 
 TransformationSpine serves every kind of caller through the same

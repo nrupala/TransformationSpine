@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Connector plugin auto-discovery tests.
 
 Discovery sources: built-ins, the ``spine.connectors`` entry-point

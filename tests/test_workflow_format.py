@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Workflow format tests: parse/serialize/Mermaid/validate round-trips
 and the remaining API read endpoints (audit F-11 coverage)."""
 

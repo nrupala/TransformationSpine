@@ -8,6 +8,9 @@ tags: [code-review, agents, spine, transformation, testing]
 location: skills/code-review-agent/SKILL.md
 ---
 
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
+
 # Code Review Agent
 
 Automates code review on TransformationSpine transformation output.

@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """The convergence test — proves the spine's core thesis.
 
 "The spine makes outcome convergence achievable no matter if it is llama.cpp

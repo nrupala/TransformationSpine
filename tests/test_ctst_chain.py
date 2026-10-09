@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """CTST hash-chain integrity tests (audit F-01 regression suite).
 
 These tests fail against the pre-fix implementation, where append()

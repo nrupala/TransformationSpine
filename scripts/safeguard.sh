@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # TransformationSpine safeguard check (BUILD_PLAN Phase 3 deliverable).
 # Verifies the spine's OS-level safeguards from the repo root:
 #   scripts/safeguard.sh [check|enforce|audit]

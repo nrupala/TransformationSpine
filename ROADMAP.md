@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # TransformationSpine — Roadmap
 
 Owned by Nrupal Akolkar. Status as of the v0.2.0 release (2026-10-09),

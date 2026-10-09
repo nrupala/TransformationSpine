@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Development Progress Tracker
 
 > Complement to BUILD_PLAN.md — tracks day-to-day progress, agent work, and

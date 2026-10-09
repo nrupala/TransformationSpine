@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Workflow execution + agents + safeguard tests (audit F-08/F-09/F-07).
 
 F-08: the workflow module was authoring-only — no execution, no cycle

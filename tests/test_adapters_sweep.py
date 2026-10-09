@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Adapter sweep: every HTTP adapter's complete/list/embed paths via
 httpx MockTransport (audit F-11 coverage for adapters.py)."""
 

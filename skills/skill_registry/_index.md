@@ -1,3 +1,5 @@
+<!-- Copyright 2026 Nrupal Akolkar -->
+<!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # skill_registry — Project Entries
 
 > Registered skills for TransformationSpine v0.2.0.

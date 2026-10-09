@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Token planner + two-tier assembly tests (engine alignment PR).
 
 Pins the Token-Efficiency Engine behavior ported from the live MyMilo
