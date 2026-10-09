@@ -5,13 +5,22 @@ workers; the spine owns context, memory, decisions, governance, and provider
 selection — so outcome convergence holds no matter which engine runs beneath.
 """
 
-from .adapters import LlamaCppProvider, OllamaProvider, OpenAIProvider
+from .adapters import (
+    HuggingFaceLocalProvider,
+    HuggingFaceProvider,
+    LlamaCppProvider,
+    OllamaProvider,
+    OpenAIProvider,
+)
 from .connectors import (
     AzureDevOpsConnector,
+    ConfluenceConnector,
     ConnectorResult,
+    DatabricksConnector,
     GitHubConnector,
     JiraConnector,
     MCPConnector,
+    ServiceNowConnector,
     ToolDef,
 )
 from .context import (
@@ -55,9 +64,14 @@ __all__ = [
     "LlamaCppProvider",
     "OllamaProvider",
     "OpenAIProvider",
+    "HuggingFaceProvider",
+    "HuggingFaceLocalProvider",
     "GitHubConnector",
     "AzureDevOpsConnector",
     "JiraConnector",
+    "ServiceNowConnector",
+    "DatabricksConnector",
+    "ConfluenceConnector",
     "MCPConnector",
     "ToolDef",
     "ConnectorResult",

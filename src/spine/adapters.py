@@ -567,7 +567,13 @@ class HuggingFaceLocalProvider:
             tool_calls=[],
         )
 
-    def embed(self, text: str, model: str | None = None) -> list[float]:
+    def embed(
+        self,
+        text: str,
+        model: str | None = None,
+        *,
+        allow_hash_fallback: bool = False,
+    ) -> list[float]:
         import torch
 
         model_name = model or self.model_id
@@ -594,6 +600,20 @@ class HuggingFaceLocalProvider:
                     emb = last_hidden.mean(dim=1).squeeze()
                     return [float(x) for x in emb.tolist()]
             except Exception:
-                # Ultimate fallback: hash-based embedding (deterministic, always works)
-                h = hash(text)
-                return [((h >> i) & 0xFF) / 255.0 for i in range(768)][:64]
+                # No real embedding backend is available. The previous
+                # fallback silently returned a pseudo-embedding built from
+                # Python's salted hash() — not a semantic vector, and not
+                # even deterministic across processes. Refuse loudly
+                # unless the caller explicitly opted into the hash vector.
+                if not allow_hash_fallback:
+                    raise RuntimeError(
+                        "No embedding backend available (sentence-transformers "
+                        "and transformers both failed to load). Refusing to "
+                        "return a pseudo-embedding; pass "
+                        "allow_hash_fallback=True if a deterministic "
+                        "non-semantic hash vector is really what you want."
+                    ) from None
+                import hashlib
+
+                digest = hashlib.sha256(text.encode()).digest()
+                return [b / 255.0 for b in digest] + [0.0] * 32
