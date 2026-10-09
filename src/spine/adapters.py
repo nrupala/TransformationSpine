@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Provider adapters — concrete Provider protocol implementations.
 
 Every adapter is stateless: it receives explicit context, makes the call,
@@ -33,10 +35,12 @@ def _context_to_messages(
     if system:
         messages.append({"role": "system", "content": system})
     for fact in sorted(context, key=lambda f: f.key):
-        messages.append({
-            "role": "user",
-            "content": f"[{fact.key}] {fact.value}",
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": f"[{fact.key}] {fact.value}",
+            }
+        )
     return messages
 
 
@@ -54,7 +58,7 @@ class LlamaCppProvider:
         self.name = "llama.cpp"
         self.endpoint = endpoint.rstrip("/")
         self.model = model
-        self.client = httpx.Client(timeout=120.0)
+        self.client = httpx.Client(timeout=120.0, trust_env=False)
 
     def list_models(self) -> list[str]:
         """Query the router's /v1/models."""
@@ -102,8 +106,7 @@ class LlamaCppProvider:
                 model=model or self.model,
                 error_signal=1.0,
                 finished_reason="error",
-                metadata={"status_code": resp.status_code,
-                          "body": resp.text[:500]},
+                metadata={"status_code": resp.status_code, "body": resp.text[:500]},
             )
 
         data = resp.json()
@@ -178,7 +181,7 @@ class OllamaProvider:
         self.name = "ollama"
         self.endpoint = endpoint.rstrip("/")
         self.model = model
-        self.client = httpx.Client(timeout=120.0)
+        self.client = httpx.Client(timeout=120.0, trust_env=False)
 
     def list_models(self) -> list[str]:
         resp = self.client.get(f"{self.endpoint}/models")
@@ -427,8 +430,7 @@ class HuggingFaceProvider:
                 model=model or self.model,
                 error_signal=1.0,
                 finished_reason="error",
-                metadata={"status_code": resp.status_code,
-                          "body": resp.text[:500]},
+                metadata={"status_code": resp.status_code, "body": resp.text[:500]},
             )
 
         data = resp.json()

@@ -1,0 +1,31 @@
+# Example Providers.yaml — copy to Providers.yaml and edit.
+# Profiles group providers; spine.factory builds the active profile's
+# adapters (SPINE_PROFILE env or the CLI --profile flag selects it).
+
+providers:
+  local:
+    endpoint: "http://127.0.0.1:8830"
+    models:
+      - "Qwen3.5-9B-Q8_0"
+    strengths:
+      - tool-calling
+      - code-generation
+
+  cloud:
+    openai:
+      endpoint: "https://api.openai.com/v1"
+      models: ["gpt-5", "gpt-5-mini"]
+    anthropic:
+      endpoint: "https://api.anthropic.com/v1"
+      models: ["claude-sonnet-4-5"]
+    huggingface:
+      endpoint: "https://api-inference.huggingface.co/v1/chat/completions"
+      models: ["google/gemma-2b-it"]
+
+  hybrid:
+    primary:
+      provider: openai
+      model: gpt-5
+    fallback:
+      provider: local
+      model: Qwen3.5-9B-Q8_0

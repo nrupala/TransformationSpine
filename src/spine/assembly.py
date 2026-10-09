@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Two-tier context assembly — CSA/HCA behavior at the engine layer.
 
 From the Token-Efficiency Engine spec (live in MyMilo since v0.36.0):

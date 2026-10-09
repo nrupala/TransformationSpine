@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 """Entrypoint script for the TransformationSpine command-line interface.
 
@@ -89,9 +91,7 @@ def do_context() -> None:
         print(f"Could not get context: {e}")
 
 
-def do_transform(
-    intent: str, provider: str, scope: str, profile: str
-) -> None:
+def do_transform(intent: str, provider: str, scope: str, profile: str) -> None:
     """Execute the transform command."""
     # The profile selects the provider through Routing.yaml when the
     # caller left the provider at its default: e.g. --profile cloud
@@ -131,9 +131,7 @@ def do_ledger(verify: bool = False) -> None:
     """Execute the ledger command."""
     if verify:
         try:
-            resp = httpx.get(
-                "http://127.0.0.1:8000/api/v1/ledger/verify", timeout=5.0
-            )
+            resp = httpx.get("http://127.0.0.1:8000/api/v1/ledger/verify", timeout=5.0)
             if resp.status_code == 200:
                 data = resp.json()
                 state = "VALID" if data["valid"] else "INVALID — chain broken"
@@ -278,9 +276,7 @@ def main() -> None:
     subparsers.add_parser("context", help="Render current in-scope context")
 
     # spine ledger
-    ledger_parser = subparsers.add_parser(
-        "ledger", help="Read CTST ledger entries"
-    )
+    ledger_parser = subparsers.add_parser("ledger", help="Read CTST ledger entries")
     ledger_parser.add_argument(
         "--verify",
         action="store_true",

@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Result and convergence types shared by spine providers.
 
 The Outcome Convergence framing, adopted from the OCS repos

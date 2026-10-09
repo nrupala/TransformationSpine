@@ -90,8 +90,8 @@ def test_tool_loop_bounded_rounds() -> None:
         model = "m"
 
         def complete(
-        self, prompt: str, context: Any = None, **kw: Any
-    ) -> ProviderResult:
+            self, prompt: str, context: Any = None, **kw: Any
+        ) -> ProviderResult:
             return ProviderResult(
                 success=True,
                 output="",
