@@ -4,7 +4,7 @@
 > A gate is PASS only with recorded evidence (command + observed output/exit code).
 > Updates to this file are append-only; corrections are new rows/entries.
 
-Last updated: 2026-09-10
+Last updated: 2026-10-08
 
 ---
 
@@ -95,8 +95,18 @@ Per BUILD_PLAN.md, each phase must pass G0-G8 with recorded evidence before merg
 | Date | Scope | User Rationale | Status |
 |------|-------|----------------|--------|
 | — | — | — | — |
-
 *No exemptions recorded. This repo follows ASF gates unconditionally.*
 
 ---
+
+## Evidence Corrections (append-only)
+
+| Date | Gate | Prior recorded evidence | Re-verified evidence | Note |
+|------|------|-------------------------|----------------------|------|
+| 2026-10-08 | G1 | `36 passed in 0.28s` | `45 passed in 1.55s` (`python -m pytest tests`) | suite grew with portledger + telemetry + tool-call tests; prior count stale |
+| 2026-10-08 | G2 | `no issues found in 12 source files` | `no issues found in 14 source files` (`python -m mypy src`); `ruff check src tests` → `All checks passed!` | oplog.py + portledger.py added since prior record |
+| 2026-10-08 | G8 | "first remote run pending repo push" | remote `origin` created (`nrupala/TransformationSpine`, private); CI workflow `ruff → mypy → pytest` on 3.11/3.12 pushed | first Actions run now triggerable |
+
+---
+
 *Build plan reference: [BUILD_PLAN.md](../BUILD_PLAN.md) — phased v0.2.0 upgrade with per-phase gate verification.*

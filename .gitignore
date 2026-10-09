@@ -19,6 +19,12 @@ Thumbs.db
 .vscode/
 *.swp
 
+# Backups / logs / scratch — never commit
+*.bak
+*.bak-*
+*.log
+logs/
+
 # Secrets — never commit
 .env
 .env.*
