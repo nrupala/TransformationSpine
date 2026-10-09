@@ -68,6 +68,14 @@ All notable changes to Transformation Spine are recorded here.
 - Zero breaking changes to v0.1.0 public interfaces
 - Build plan follows phased approach with verified exit conditions per phase
 
+### Fixed
+- Declared previously missing core runtime dependencies in `pyproject.toml`:
+  `fastapi`, `httpx`, `uvicorn`, `pyyaml`. They were imported by `src/spine`
+  but only present via the developer's global environment, so a clean install
+  failed mypy in CI. Added a `local` optional extra for the heavyweight
+  HuggingFace stack (`transformers`, `torch`, `sentence-transformers`).
+  Verified by a clean Python 3.11 venv (install + ruff + mypy + 45 tests PASS).
+
 ## [0.1.0] - 2026-09-07
 
 ### Added

@@ -106,6 +106,9 @@ Per BUILD_PLAN.md, each phase must pass G0-G8 with recorded evidence before merg
 | 2026-10-08 | G1 | `36 passed in 0.28s` | `45 passed in 1.55s` (`python -m pytest tests`) | suite grew with portledger + telemetry + tool-call tests; prior count stale |
 | 2026-10-08 | G2 | `no issues found in 12 source files` | `no issues found in 14 source files` (`python -m mypy src`); `ruff check src tests` → `All checks passed!` | oplog.py + portledger.py added since prior record |
 | 2026-10-08 | G8 | "first remote run pending repo push" | remote `origin` created (`nrupala/TransformationSpine`, private); CI workflow `ruff → mypy → pytest` on 3.11/3.12 pushed | first Actions run now triggerable |
+| 2026-10-09 | G0 | `pip install -e ".[dev]"` → exit 0 (dirty local env, deps already globally present) | clean 3.11 venv: `pip install -e ".[dev]"` exit 0; `pip check` → "No broken requirements found." | **Defect found by first CI run**: core runtime deps `fastapi`, `httpx`, `uvicorn`, `pyyaml` were used by `src/spine` but undeclared. Fixed in `pyproject.toml` (added core deps + `local` extra for transformers/torch/sentence-transformers). Prior PASS was an artifact of the dirty global environment. |
+| 2026-10-09 | G1 / G2 / G5 | local-machine only (dirty env) | clean 3.11 venv: `pytest tests` → `45 passed, 1 warning`; `ruff check src tests` → `All checks passed!`; `mypy src` → `Success: no issues found in 14 source files` | reproducible clean-env verification now recorded |
+| 2026-10-09 | G8 | "first remote run now triggerable" | CI run 37894922922 **FAILED** on `mypy` (12 errors from undeclared fastapi/httpx); after pyproject dependency fix, re-run pending | G8 was previously recorded PASS on file presence only; a genuine CI pass had not yet been observed |
 
 ---
 
