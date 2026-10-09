@@ -223,7 +223,196 @@ def validate_workflow(workflow: Workflow) -> list[str]:
         if node.type == "gate" and not node.gate:
             errors.append(f"Gate node '{node.id}' requires a gate condition")
 
+    if workflow.nodes and not errors:
+        try:
+            topological_order(workflow)
+        except ValueError as e:
+            errors.append(str(e))
+
     return errors
+
+
+def topological_order(workflow: Workflow) -> list[WorkflowNode]:
+    """Return nodes in dependency (topological) order.
+
+    Raises ValueError naming the cycle when the graph cannot be
+    ordered — execution and validation both depend on this, and the
+    authoring-only version of this module never checked for cycles.
+    """
+    indegree: dict[str, int] = {node.id: 0 for node in workflow.nodes}
+    outgoing: dict[str, list[str]] = {node.id: [] for node in workflow.nodes}
+    for edge in workflow.edges:
+        outgoing[edge.from_node].append(edge.to_node)
+        indegree[edge.to_node] += 1
+    queue = sorted(nid for nid, deg in indegree.items() if deg == 0)
+    by_id = {node.id: node for node in workflow.nodes}
+    ordered: list[WorkflowNode] = []
+    while queue:
+        nid = queue.pop(0)
+        ordered.append(by_id[nid])
+        for nxt in sorted(outgoing[nid]):
+            indegree[nxt] -= 1
+            if indegree[nxt] == 0:
+                queue.append(nxt)
+                queue.sort()
+    if len(ordered) != len(workflow.nodes):
+        stuck = sorted(set(indegree) - {n.id for n in ordered})
+        raise ValueError(f"Workflow graph has a cycle involving: {stuck}")
+    return ordered
+
+
+_GATE_OPS = ("==", "!=", "<=", ">=", "<", ">")
+
+
+def _eval_gate(expression: str, state: dict[str, Any]) -> bool:
+    """Evaluate a gate expression of the form ``<key> <op> <number>``.
+
+    Deliberately a tiny, safe subset (no eval): the left side is a state
+    key, the right side a numeric literal. Unknown shapes raise
+    ValueError rather than guessing.
+    """
+    for op in _GATE_OPS:
+        if op in expression:
+            left, _, right = expression.partition(op)
+            key = left.strip()
+            if key not in state:
+                raise ValueError(f"Gate references unknown state key '{key}'")
+            actual = float(state[key])
+            target = float(right.strip())
+            if op == "==":
+                return actual == target
+            if op == "!=":
+                return actual != target
+            if op == "<=":
+                return actual <= target
+            if op == ">=":
+                return actual >= target
+            if op == "<":
+                return actual < target
+            return actual > target
+    raise ValueError(f"Unsupported gate expression: {expression!r}")
+
+
+@dataclass
+class WorkflowRun:
+    """The record of one workflow execution."""
+
+    order: list[str]
+    outputs: dict[str, Any]
+    status: str  # "completed" | "gate_failed" | "action_failed"
+    failed_node: str = ""
+    error: str = ""
+
+
+def execute_workflow(
+    workflow: Workflow,
+    handlers: dict[str, Any],
+    initial_state: dict[str, Any] | None = None,
+) -> WorkflowRun:
+    """Execute a workflow: nodes in topological order, gates enforced.
+
+    ``handlers`` maps an action string (e.g. ``provider.complete``) to a
+    callable ``handler(node, state) -> value``; the value is stored in
+    state under the node's id and in the run's outputs. Gate nodes
+    evaluate their expression against state — a failed gate stops the
+    run with status ``gate_failed`` (the spine's semantics: a gate that
+    fails blocks everything downstream, exactly as the gated cycle
+    blocks a commit). Input/output nodes pass state through.
+    """
+    state: dict[str, Any] = dict(initial_state or {})
+    outputs: dict[str, Any] = {}
+    order: list[str] = []
+    for node in topological_order(workflow):
+        order.append(node.id)
+        if node.type == "gate":
+            try:
+                passed = _eval_gate(node.gate, state)
+            except ValueError as e:
+                return WorkflowRun(order, outputs, "action_failed", node.id, str(e))
+            outputs[node.id] = {"gate": node.gate, "passed": passed}
+            if not passed:
+                return WorkflowRun(order, outputs, "gate_failed", node.id)
+        elif node.type == "action":
+            handler = handlers.get(node.action)
+            if handler is None:
+                return WorkflowRun(
+                    order,
+                    outputs,
+                    "action_failed",
+                    node.id,
+                    f"No handler registered for action '{node.action}'",
+                )
+            try:
+                value = handler(node, state)
+            except Exception as e:  # handler failures are run data
+                return WorkflowRun(
+                    order, outputs, "action_failed", node.id, f"{type(e).__name__}: {e}"
+                )
+            state[node.id] = value
+            outputs[node.id] = value
+        else:  # input / output nodes pass through
+            outputs[node.id] = state.get(node.id)
+    return WorkflowRun(order, outputs, "completed")
+
+
+def build_default_handlers(
+    *,
+    store: Any = None,
+    provider: Any = None,
+    ledger: Any = None,
+) -> dict[str, Any]:
+    """Real handlers for the standard template's actions.
+
+    - ``context.assemble`` renders the store's in-scope snapshot.
+    - ``provider.complete`` runs the provider on the run's input and
+      publishes its ``error_signal`` into state, which is what the
+      template's gate (``error_signal == 0``) reads. With no reachable
+      provider it reports error_signal 1.0 — the gate then blocks the
+      commit, which is the spine working as designed, not a fake pass.
+    - ``ledger.append`` writes a real CTST record and returns its hash.
+    """
+
+    def _assemble(node: WorkflowNode, state: dict[str, Any]) -> str:
+        if store is None:
+            return ""
+        from ..context import ContextScope
+        from ..store import snapshot_for_prompt
+
+        return snapshot_for_prompt(store, ContextScope.SESSION)
+
+    def _complete(node: WorkflowNode, state: dict[str, Any]) -> float:
+        if provider is None:
+            state["error_signal"] = 1.0
+            return 1.0
+        result = provider.complete(
+            prompt=str(state.get("input", "")),
+            context=[],
+            max_tokens=512,
+            temperature=0.0,
+        )
+        state["error_signal"] = float(result.error_signal)
+        state["output"] = result.output
+        return float(result.error_signal)
+
+    def _append(node: WorkflowNode, state: dict[str, Any]) -> str:
+        if ledger is None:
+            return ""
+        from ..ctst import CTSTRecord
+
+        record = CTSTRecord(
+            intent={"summary": str(state.get("input", ""))},
+            mechanism="workflow",
+            outcome={"output": state.get("output", "")},
+            error_signal=float(state.get("error_signal", 1.0)),
+            committed=True,
+        )
+        return str(ledger.append(record))
+
+    return {
+        "context.assemble": _assemble,
+        "provider.complete": _complete,
+        "ledger.append": _append,
+    }
 
 
 def workflow_from_template(name: str, profile: str = "local") -> Workflow:

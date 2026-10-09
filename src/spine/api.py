@@ -284,11 +284,28 @@ def create_app() -> FastAPI:
     async def status() -> dict[str, Any]:
         """Health+status endpoint."""
         providers = list(provider_map.keys()) if provider_map else []
+        # Safeguard posture is part of status: count world-writable
+        # files under the project root (the enforceable check in
+        # spine.safeguard) instead of merely asserting safeguards exist.
+        world_writable = -1
+        _root = ""
+        try:
+            from spine.safeguard import get_project_root, world_writable_count
+
+            world_writable = world_writable_count()
+            _root = str(get_project_root())
+        except Exception:
+            pass
         return {
             "status": "ok",
             "providers": providers,
             "context_size": len(store.visible_to(ContextScope.SESSION)) if store else 0,
             "ledger_entries": len(ctst_ledger.read()) if ctst_ledger else 0,
+            "safeguards": {
+                "project_root": _root,
+                "world_writable_files": world_writable,
+            },
+            "tools": tool_registry.names() if tool_registry else [],
         }
 
     @app.get("/api/v1/context")  # noqa: F821
