@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """MCP server surface — the spine served to agents over MCP.
 
 Implements the Model Context Protocol's core tool flow as JSON-RPC 2.0

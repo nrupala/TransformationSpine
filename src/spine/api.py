@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """TransformationSpine FastAPI application.
 
 The spine API orchestrates the closed-loop control cycle:

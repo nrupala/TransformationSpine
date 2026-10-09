@@ -145,3 +145,11 @@ Release coherence: package + API version 0.2.0, CHANGELOG 0.2.0 dated
 2026-10-09. The `v0.2.0` git tag still points at the pre-remediation
 commit `69f7608f`; re-tagging at the merged remediation HEAD is the
 release owner's step after these PRs land.
+
+---
+
+**License change (2026-10-09):** the project license changed from
+Apache-2.0 to AGPL-3.0-or-later with a commercial dual license
+(`LICENSE-COMMERCIAL.md`), by decision of the copyright holder.
+The G3 row above records the state at its check date (Apache-2.0);
+this note supersedes the license named there for current state.

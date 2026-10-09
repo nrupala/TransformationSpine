@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Ops logging contract (G10) for TransformationSpine services.
 
 JSON-lines: ts/level/service/version/msg + ctx fields. One canonical file per

@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Context lifecycle scoping — the transformation spine's core data model.
 
 Context is contextual to its usage. This module formalizes that insight as an
