@@ -36,6 +36,18 @@ class ProviderResult:
     telemetry: dict[str, Any] = field(default_factory=dict)
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
 
+    def __post_init__(self) -> None:
+        # Telemetry is derived from usage at construction, so every
+        # adapter that reports usage (all of them) populates telemetry —
+        # before this, the field existed but no code path ever filled it,
+        # and the /telemetry endpoint aggregated permanent zeros.
+        if not self.telemetry and self.usage:
+            self.telemetry = {
+                k: self.usage[k]
+                for k in ("prompt_tokens", "completion_tokens", "total_tokens")
+                if k in self.usage
+            }
+
     @property
     def is_converged(self) -> bool:
         """A result converged when the error signal reached zero."""

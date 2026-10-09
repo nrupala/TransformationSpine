@@ -22,6 +22,7 @@ from .context import (
     declare,
 )
 from .ctst import CTSTLedger, CTSTRecord
+from .gates import GateCheck, GateReport, evaluate_result
 from .provider import ModelSpec, Provider, RouterRule
 from .result import ProviderResult
 from .safeguard import (
@@ -48,6 +49,9 @@ __all__ = [
     "snapshot_for_prompt",
     "CTSTRecord",
     "CTSTLedger",
+    "GateCheck",
+    "GateReport",
+    "evaluate_result",
     "LlamaCppProvider",
     "OllamaProvider",
     "OpenAIProvider",
