@@ -78,22 +78,30 @@ def _run_gated_cycle(
             "reason": f"Provider '{provider_name}' not registered",
         }
 
+    import time as _time
+
+    t0 = _time.time()
     result: ProviderResult = provider.complete(
         prompt=prompt,
         context=context,
         max_tokens=512,
         temperature=0.0,
     )
+    latency_ms = int((_time.time() - t0) * 1000)
 
-    error_signal = result.error_signal
+    # The authoritative error signal is computed here, by the caller-side
+    # gates (spine.gates) — never trusted from the adapter, whose own
+    # error_signal is only a transport hint.
+    from spine.gates import evaluate_result
+
+    report = evaluate_result(result)
+    error_signal = report.error_signal
     output = result.output or ""
 
-    # Simple gate: error_signal must be 0.0 (converged) and output non-empty
-    # to count as committed. In production this would call pytest/ruff/etc.
     if error_signal == 0.0 and output:
         verdict = "commit"
         committed = True
-    elif error_signal > 0.0 and error_signal < 1.0:
+    elif 0.0 < error_signal < 1.0:
         verdict = "retry"
         committed = False
     else:
@@ -106,6 +114,9 @@ def _run_gated_cycle(
         "verdict": verdict,
         "committed": committed,
         "reason": f"error_signal={error_signal:.3f}, provider={provider_name}",
+        "gates": report.to_dict(),
+        "latency_ms": latency_ms,
+        "provider_result": result,
     }
 
 
@@ -250,8 +261,20 @@ def create_app() -> FastAPI:
         if store is None:
             raise HTTPException(status_code=503, detail="Spine not initialized")
 
+        # Scope names arrive as API input ("SESSION"); enum values are
+        # lowercase. Normalize, and reject unknown scopes with a 400 —
+        # previously the default itself raised an uncaught ValueError.
+        try:
+            scope_enum = ContextScope(scope.lower())
+        except ValueError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown scope '{scope}'. "
+                f"Valid: {[s.value for s in ContextScope]}",
+            ) from None
+
         # Assemble in-scope context facts
-        context_facts = store.visible_to(ContextScope(scope))
+        context_facts = store.visible_to(scope_enum)
 
         # Build a prompt from those facts + the user's intent
         prompt_parts = [
@@ -264,13 +287,30 @@ def create_app() -> FastAPI:
         # Run one gated cycle
         result = _run_gated_cycle(provider, prompt, context_facts)
 
-        # If the cycle committed, record a CTST entry
-        if ctst_ledger and result["committed"]:
+        # Record EVERY cycle in the CTST ledger — the ledger is the record
+        # of transformation *attempts* (committed and rejected alike), with
+        # the verdict, gate evidence, and telemetry attached. Before this,
+        # only committed cycles were written, and they were written with
+        # committed=False and no telemetry, so the ledger and the
+        # /telemetry endpoint could never show what actually happened.
+        if ctst_ledger:
+            provider_result: ProviderResult = result["provider_result"]
             record = CTSTRecord(
                 intent={"summary": intent, "provider": provider},
                 context={f.key: f.value for f in context_facts},
                 mechanism=provider,
+                outcome={"output": result["output"]},
+                assessment={
+                    "verdict": result["verdict"],
+                    "gates": result["gates"],
+                },
                 error_signal=result["error_signal"],
+                committed=bool(result["committed"]),
+                telemetry={
+                    **provider_result.telemetry,
+                    "latency_ms": result["latency_ms"],
+                    "error_signal": result["error_signal"],
+                },
             )
             ctst_ledger.append(record)
 
@@ -282,7 +322,8 @@ def create_app() -> FastAPI:
             "error_signal": result["error_signal"],
             "verdict": result["verdict"],
             "committed": result["committed"],
-            "context_rendered": _render_context(ContextScope(scope)),
+            "gates": result["gates"],
+            "context_rendered": _render_context(scope_enum),
         }
 
     @app.get("/api/v1/ledger")
@@ -311,7 +352,6 @@ def create_app() -> FastAPI:
         if ctst_ledger is not None:
             records = ctst_ledger.read()
             for r in records:
-                # We store ProviderResult dict via r.to_dict(); parse telemetry
                 data = r.to_dict()
                 t = data.get("telemetry", {})
                 p = data.get("mechanism", "unknown")
@@ -326,8 +366,9 @@ def create_app() -> FastAPI:
                 for k in ("prompt_tokens", "completion_tokens", "total_tokens"):
                     if k in t and t[k] is not None:
                         telemetry_by_provider[p][k].append(t[k])
-                if "error_signal" in t:
-                    telemetry_by_provider[p]["error_signals"].append(t["error_signal"])
+                # The authoritative error signal is the record's own field,
+                # set by the gated cycle — not a copy inside telemetry.
+                telemetry_by_provider[p]["error_signals"].append(r.error_signal)
                 telemetry_by_provider[p]["count"] += 1
 
         # Compute aggregates
@@ -338,16 +379,20 @@ def create_app() -> FastAPI:
         for provider, metrics in telemetry_by_provider.items():
             cs = metrics["count"]
             agg["providers"][provider] = {
-                "prompt_tokens_avg": sum(metrics["prompt_tokens"]) / cs
+                "prompt_tokens_avg": sum(metrics["prompt_tokens"])
+                / len(metrics["prompt_tokens"])
                 if metrics["prompt_tokens"]
                 else 0,
-                "completion_tokens_avg": sum(metrics["completion_tokens"]) / cs
+                "completion_tokens_avg": sum(metrics["completion_tokens"])
+                / len(metrics["completion_tokens"])
                 if metrics["completion_tokens"]
                 else 0,
-                "total_tokens_avg": sum(metrics["total_tokens"]) / cs
+                "total_tokens_avg": sum(metrics["total_tokens"])
+                / len(metrics["total_tokens"])
                 if metrics["total_tokens"]
                 else 0,
-                "avg_error_signal": sum(metrics["error_signals"]) / cs
+                "avg_error_signal": sum(metrics["error_signals"])
+                / len(metrics["error_signals"])
                 if metrics["error_signals"]
                 else 0,
                 "runs": cs,
