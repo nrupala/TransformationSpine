@@ -120,8 +120,11 @@ async def lifespan(app: Any) -> Any:
     from spine.ctst import CTSTLedger  # noqa: F811
     from spine.store import ContextStore  # noqa: F811
 
-    # Initialize context store and CTST ledger
-    store = ContextStore()
+    # Initialize context store (durable backing: PROJECT/PERSISTENT facts
+    # survive restarts; path overridable via SPINE_CONTEXT_PATH) and ledger.
+    store = ContextStore(
+        path=os.environ.get("SPINE_CONTEXT_PATH", "spine-context.json")
+    )
     ctst_ledger = CTSTLedger()
 
     # Register LlamaCppProvider (connects to :8830 OpenAI-compatible router)
