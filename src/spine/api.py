@@ -26,9 +26,12 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException, Request
+
+if TYPE_CHECKING:
+    from spine.agent_surfaces import A2AAgent, ACPAgent
 from fastapi.responses import JSONResponse
 
 from spine import ContextScope, __version__
@@ -270,6 +273,9 @@ def _init_state() -> None:
 def _teardown_state() -> None:
     """Release all spine state."""
     global store, ctst_ledger, tool_registry, connector_registry
+    global _a2a_agent, _acp_agent
+    _a2a_agent = None
+    _acp_agent = None
     store = None
     ctst_ledger = None
     tool_registry = None
@@ -471,6 +477,36 @@ def build_status() -> dict[str, Any]:
         "tools": tool_registry.names() if tool_registry else [],
         "connectors": connector_registry.names() if connector_registry else [],
     }
+
+
+_a2a_agent: A2AAgent | None = None
+_acp_agent: ACPAgent | None = None
+
+
+def _get_a2a_agent() -> A2AAgent:
+    """The A2A handler (task store lives for the app's lifetime)."""
+    global _a2a_agent
+    if _a2a_agent is None:
+        from spine import __version__ as _v
+        from spine.agent_surfaces import A2AAgent
+
+        _a2a_agent = A2AAgent(
+            transform=lambda **kw: execute_transform(**kw), version=_v
+        )
+    return _a2a_agent
+
+
+def _get_acp_agent() -> ACPAgent:
+    """The ACP handler (run store lives for the app's lifetime)."""
+    global _acp_agent
+    if _acp_agent is None:
+        from spine import __version__ as _v
+        from spine.agent_surfaces import ACPAgent
+
+        _acp_agent = ACPAgent(
+            transform=lambda **kw: execute_transform(**kw), version=_v
+        )
+    return _acp_agent
 
 
 def build_mcp_server() -> Any:
@@ -690,6 +726,52 @@ def create_app() -> FastAPI:
         if response is None:
             return Response(status_code=202)
         return response
+
+    @app.get("/.well-known/agent-card.json")
+    async def agent_card() -> dict[str, Any]:
+        """A2A discovery document for agent callers."""
+        return _get_a2a_agent().card()
+
+    @app.post("/a2a")
+    async def a2a_endpoint(payload: dict[str, Any]) -> Any:
+        """A2A JSON-RPC: message/send and tasks/get over the gated cycle."""
+        from fastapi.responses import Response
+
+        response = _get_a2a_agent().handle(payload)
+        if response is None:
+            return Response(status_code=202)
+        return response
+
+    @app.get("/acp/agents")
+    async def acp_agents() -> list[dict[str, Any]]:
+        """ACP agent manifests."""
+        return [_get_acp_agent().manifest()]
+
+    @app.post("/acp/agents/{name}/runs")
+    async def acp_create_run(name: str, payload: dict[str, Any]) -> dict[str, Any]:
+        """ACP: create (and synchronously execute) a run."""
+        agent = _get_acp_agent()
+        if name != agent.manifest()["name"]:
+            raise HTTPException(status_code=404, detail=f"Unknown agent '{name}'")
+        return agent.create_run(payload)
+
+    @app.get("/acp/agents/{name}/runs/{run_id}")
+    async def acp_get_run(name: str, run_id: str) -> dict[str, Any]:
+        """ACP: read a run's status and output."""
+        agent = _get_acp_agent()
+        run = agent.runs.get(run_id)
+        if run is None or name != agent.manifest()["name"]:
+            raise HTTPException(status_code=404, detail="Run not found")
+        return run
+
+    @app.get("/ui")
+    async def ui() -> Any:
+        """Browser UI for humans — one self-contained page over the API."""
+        from fastapi.responses import HTMLResponse
+
+        from spine.webui import UI_HTML
+
+        return HTMLResponse(content=UI_HTML)
 
     @app.get("/api/v1/telemetry")
     async def telemetry_endpoint() -> dict[str, Any]:
