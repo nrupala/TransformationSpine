@@ -1,33 +1,131 @@
-# Python
+# ─────────────────────────────────────────────────────────────
+# Transformation Spine — .gitignore
+# Rule: source lives in git; secrets, model weights, datasets,
+# and runtime artifacts never leave the machine.
+# ─────────────────────────────────────────────────────────────
+
+# ── Python build / cache artifacts ────────────────────────────
 __pycache__/
 *.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+wheels/
 .venv/
 venv/
-*.egg-info/
-dist/
-build/
+env/
+.python-version
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
-*.db
-*.sqlite3
+.pytype/
+.tox/
+.nox/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
 
-# OS/editor
+# ── Secrets & credentials (NEVER commit) ──────────────────────
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.p12
+*.pfx
+*.cer
+*.crt
+*.jks
+*.keystore
+secrets/
+.secrets/
+credentials*
+*credentials.json
+auth.json
+*.token
+*.secret
+kubeconfig*
+*.kdbx
+
+# ── Model weights & model caches (large binaries) ────────────
+*.gguf
+*.ggml
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.h5
+*.tflite
+*.msgpack
+models/
+model_cache/
+checkpoints/
+.cache/
+huggingface/
+hf_cache/
+transformers_cache/
+
+# ── Datasets & large data ─────────────────────────────────────
+data/
+datasets/
+*.parquet
+*.arrow
+*.feather
+*.npz
+*.npy
+*.pkl
+*.pickle
+*.joblib
+*.csv.gz
+*.ndjson
+
+# ── Runtime state / output (not source) ───────────────────────
+ledger/*
+!ledger/.gitkeep
+logs/
+*.log
+*.jsonl
+tmp/
+temp/
+scratch/
+*.tmp
+*.temp
+
+# ── Local machine / personal config ───────────────────────────
+User_Profile.yaml
+*.local.yaml
+*.local.yml
+config.local.*
+.spine/
+
+# ── Archives ──────────────────────────────────────────────────
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.rar
+*.gz
+
+# ── OS / editor junk ──────────────────────────────────────────
 .DS_Store
 Thumbs.db
+desktop.ini
 .idea/
 .vscode/
 *.swp
-
-# Backups / logs / scratch — never commit
+*.swo
+*~
+.history/
 *.bak
 *.bak-*
-*.log
-logs/
+*.orig
+*.rej
 
-# Secrets — never commit
-.env
-.env.*
-*.key
-*.pem
-secrets/
+# ── Notebooks ─────────────────────────────────────────────────
+.ipynb_checkpoints/

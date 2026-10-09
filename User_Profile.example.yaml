@@ -1,9 +1,11 @@
-user:
+# User_Profile.example.yaml
+# Copy to `User_Profile.yaml` (ignored by git) and fill in for your machine.
+# The spine loads user preferences before routing/answering.
 
-  name: Nrupal Akolkar
+user:
+  name: <your name>
 
 preferences:
-
   architecture_style:
     - provider neutral
     - platform first
@@ -17,8 +19,6 @@ preferences:
     - transformation
     - enterprise ai
     - agent platforms
-    - factory ai
-    - mcp
 
 decision_patterns:
   - avoid lock in
