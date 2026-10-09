@@ -12,6 +12,7 @@ from .adapters import (
     OllamaProvider,
     OpenAIProvider,
 )
+from .assembly import Assembly, assemble_context
 from .connectors import (
     AzureDevOpsConnector,
     ConfluenceConnector,
@@ -42,6 +43,13 @@ from .safeguard import (
     verify_write_protection,
 )
 from .store import ContextStore, ScopeViolationError, snapshot_for_prompt
+from .tokenplan import (
+    ContextOverflowError,
+    RouteSpec,
+    estimate_tokens,
+    plan_max_tokens,
+    route_spec,
+)
 
 __all__ = [
     "ContextFact",
@@ -61,6 +69,13 @@ __all__ = [
     "GateCheck",
     "GateReport",
     "evaluate_result",
+    "Assembly",
+    "assemble_context",
+    "RouteSpec",
+    "route_spec",
+    "plan_max_tokens",
+    "estimate_tokens",
+    "ContextOverflowError",
     "LlamaCppProvider",
     "OllamaProvider",
     "OpenAIProvider",

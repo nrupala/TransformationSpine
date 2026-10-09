@@ -282,6 +282,50 @@ class ContextStore:
         self._save()
         return promoted_count
 
+    def compact_session(
+        self, session_id: str, summary_text: str
+    ) -> ContextFact | None:
+        """Fold a session's facts into one compaction-checkpoint summary.
+
+        The checkpoint pattern from the Token-Efficiency Engine (MyMilo
+        checkpoint v2): long session history is *replaced* by a summary
+        fact that carries its coverage — how many facts it folds and the
+        earliest fact time it covers — so nothing is unrecoverable and
+        the summary tier in context assembly can state what it stands
+        for. Returns the summary fact, or None when the session held no
+        facts. The summary fact is SESSION-scoped and owned by the
+        session, so it persists (per scope policy) while the session is
+        open and is itself folded by consolidate_session at close.
+        """
+        facts = [
+            f
+            for f in self._facts.values()
+            if f.scope is ContextScope.SESSION and f.owner == session_id
+        ]
+        if not facts:
+            return None
+        covered_from = min(f.created_at for f in facts)
+        for fact in facts:
+            self._facts.pop((fact.key, ContextScope.SESSION, session_id), None)
+        summary = ContextFact(
+            key=f"session-summary:{session_id}",
+            value=summary_text,
+            scope=ContextScope.SESSION,
+            origin=(
+                f"compacted:{len(facts)}:from:{covered_from.isoformat()}"
+            ),
+            owner=session_id,
+        )
+        self._facts[(summary.key, ContextScope.SESSION, session_id)] = summary
+        self._save()
+        return summary
+
+    def session_summary(self, session_id: str) -> ContextFact | None:
+        """Return the session's compaction-checkpoint fact, if any."""
+        return self._facts.get(
+            (f"session-summary:{session_id}", ContextScope.SESSION, session_id)
+        )
+
     def open_session(self, session_id: str) -> None:
         """Mark a session open (only open sessions hold SESSION facts)."""
         self._session_open.add(session_id)
