@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -46,6 +47,12 @@ class CTSTRecord:
     error_signal: float = 1.0
     committed: bool = False
     telemetry: dict[str, Any] = field(default_factory=dict)
+    # Hash-chain fields, assigned by CTSTLedger.append() and persisted in
+    # the JSONL line so the chain survives process restarts. Empty for
+    # records that have not been appended yet (and for legacy lines written
+    # before hashes were persisted).
+    prev_hash: str = ""
+    record_hash: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -65,6 +72,8 @@ class CTSTRecord:
             "error_signal": self.error_signal,
             "committed": self.committed,
             "telemetry": self.telemetry,
+            "prev_hash": self.prev_hash,
+            "record_hash": self.record_hash,
         }
 
     @staticmethod
@@ -87,6 +96,8 @@ class CTSTRecord:
             error_signal=data.get("error_signal", 1.0),
             committed=data.get("committed", False),
             telemetry=data.get("telemetry", {}),
+            prev_hash=data.get("prev_hash", ""),
+            record_hash=data.get("record_hash", ""),
         )
 
 
@@ -98,26 +109,70 @@ class CTSTLedger:
     forming a chain. Any tampering breaks the chain.
     """
 
-    def __init__(self, root: str | Path = "ledger") -> None:
+    def __init__(self, root: str | Path | None = None) -> None:
+        if root is None:
+            root = os.environ.get("SPINE_CTST_ROOT", "ledger")
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
         self._chain: list[str] = []  # hash chain for integrity
+        self._rebuild_chain()
 
     def _file_path(self, date: datetime | None = None) -> Path:
         d = date or datetime.now(UTC)
         return self.root / f"ctst_{d.strftime('%Y-%m-%d')}.jsonl"
 
     def _hash_record(self, record: CTSTRecord, prev_hash: str = "") -> str:
-        """Compute SHA-256 hash of a record including previous hash."""
+        """Compute SHA-256 hash of a record including previous hash.
+
+        The hash fields themselves are excluded from the payload; the
+        previous hash enters as ``_prev_hash`` so a record's hash binds
+        both its content and its position in the chain.
+        """
         data = record.to_dict()
+        data.pop("prev_hash", None)
+        data.pop("record_hash", None)
         data["_prev_hash"] = prev_hash
         payload = json.dumps(data, sort_keys=True, default=str)
         return hashlib.sha256(payload.encode()).hexdigest()
 
+    def _iter_lines(self) -> Any:
+        """Yield (file_path, parsed dict) for every stored line, in order."""
+        for file_path in sorted(self.root.glob("ctst_*.jsonl")):
+            with open(file_path, encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if line:
+                        yield file_path, json.loads(line)
+
+    def _rebuild_chain(self) -> None:
+        """Rebuild the in-memory chain head from what is stored on disk.
+
+        Lines written by this version carry their hash; legacy lines
+        (written before hashes were persisted) are folded into the chain
+        by computing their chained hash, so appends after a restart
+        continue the same chain instead of restarting it.
+        """
+        self._chain = []
+        prev_hash = ""
+        for _path, data in self._iter_lines():
+            stored = data.get("record_hash", "")
+            if stored:
+                prev_hash = stored
+            else:
+                prev_hash = self._hash_record(CTSTRecord.from_dict(data), prev_hash)
+            self._chain.append(prev_hash)
+
     def append(self, record: CTSTRecord) -> str:
-        """Append a CTST record to the ledger. Returns the record's hash."""
+        """Append a CTST record to the ledger. Returns the record's hash.
+
+        The record's ``prev_hash``/``record_hash`` are set on the record
+        and persisted in the JSONL line, so the chain is verifiable from
+        disk alone, in any later process.
+        """
         prev_hash = self._chain[-1] if self._chain else ""
         record_hash = self._hash_record(record, prev_hash)
+        record.prev_hash = prev_hash
+        record.record_hash = record_hash
         file_path = self._file_path()
 
         with open(file_path, "a", encoding="utf-8") as f:
@@ -125,6 +180,11 @@ class CTSTLedger:
 
         self._chain.append(record_hash)
         return record_hash
+
+    @property
+    def head_hash(self) -> str:
+        """Hash of the most recent record in the chain ("" if empty)."""
+        return self._chain[-1] if self._chain else ""
 
     def read(self, date: datetime | None = None) -> list[CTSTRecord]:
         """Read all records from a day's ledger (default: today)."""
@@ -162,22 +222,33 @@ class CTSTLedger:
         return records
 
     def verify_chain(self) -> bool:
-        """Verify the hash chain integrity. Returns True if unbroken."""
+        """Verify the hash chain integrity from disk. True iff unbroken.
+
+        Every line is checked, in file/date order:
+        - a line carrying hashes must name the running chain head as its
+          ``prev_hash``, and its stored ``record_hash`` must equal the
+          hash recomputed from its content plus that prev_hash. Any edit
+          to a stored record — content, hashes, order, or deletion of a
+          non-final line — fails this check.
+        - a legacy line (written before hashes were persisted) carries no
+          stored hash to check against; it is folded into the running
+          chain by computation and verification continues. Legacy lines
+          are therefore covered only transitively, through the stored
+          hashes of the records that follow them.
+        """
         prev_hash = ""
-        for file_path in sorted(self.root.glob("ctst_*.jsonl")):
-            with open(file_path, encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                data = json.loads(line)
-                data["_prev_hash"] = prev_hash
-                expected = hashlib.sha256(
-                    json.dumps(data, sort_keys=True, default=str).encode()
-                ).hexdigest()
-                if expected != prev_hash and prev_hash != "":
+        for _path, data in self._iter_lines():
+            stored_prev = data.get("prev_hash", "")
+            stored_hash = data.get("record_hash", "")
+            record = CTSTRecord.from_dict(data)
+            if stored_hash:
+                if stored_prev != prev_hash:
                     return False
-                prev_hash = expected
+                if self._hash_record(record, prev_hash) != stored_hash:
+                    return False
+                prev_hash = stored_hash
+            else:
+                prev_hash = self._hash_record(record, prev_hash)
         return True
 
     def lineage(self, record_id: str) -> list[CTSTRecord]:
