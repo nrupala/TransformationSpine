@@ -140,8 +140,12 @@ def _run_gated_cycle(
 # ── Lifespan ─────────────────────────────────────────────────────────
 
 
-@asynccontextmanager
-async def lifespan(app: Any) -> Any:
+def _init_state() -> None:
+    """Initialize all spine state (store, ledger, registries, providers).
+
+    Called by the FastAPI lifespan and by non-HTTP transports (the MCP
+    stdio server) so every surface runs the identical spine.
+    """
     global store, ctst_ledger, provider_map, tool_registry, connector_registry
 
     # Import the package modules after app starts to avoid circular deps
@@ -213,12 +217,6 @@ async def lifespan(app: Any) -> Any:
                 profile=profile,
                 error=str(e),
             )
-        yield
-        store = None
-        ctst_ledger = None
-        tool_registry = None
-        connector_registry = None
-        provider_map.clear()
         return
     try:
         # Default: Qwen3.5-9B-Q8_0 — verified tool-capable (structured
@@ -266,9 +264,12 @@ async def lifespan(app: Any) -> Any:
         except Exception as e:
             print(f"[spine] Could not register OpenAIProvider: {e}")
 
-    yield  # app runs
+    return
 
-    # Cleanup
+
+def _teardown_state() -> None:
+    """Release all spine state."""
+    global store, ctst_ledger, tool_registry, connector_registry
     store = None
     ctst_ledger = None
     tool_registry = None
@@ -276,7 +277,287 @@ async def lifespan(app: Any) -> Any:
     provider_map.clear()
 
 
+@asynccontextmanager
+async def lifespan(app: Any) -> Any:
+    _init_state()
+    yield  # app runs
+    _teardown_state()
+
+
 # ── FastAPI application factory ──────────────────────────────────────
+
+
+class CycleError(Exception):
+    """Transport-neutral cycle failure carrying an HTTP-style status."""
+
+    def __init__(self, status_code: int, detail: str) -> None:
+        super().__init__(detail)
+        self.status_code = status_code
+        self.detail = detail
+
+
+def execute_transform(
+    intent: str,
+    provider: str = "llama.cpp",
+    scope: str = "SESSION",
+) -> dict[str, Any]:
+    """Submit a transformation intent and execute the gated cycle.
+
+    Args:
+        intent: What to accomplish (user description).
+        provider: Which Provider adapter to use (registered in lifespan).
+        scope: Context scope to assemble for the prompt.
+
+    Returns:
+        Dict with output, error_signal, verdict, committed flag, and
+        the rendered context.
+    """
+    if provider not in provider_map:
+        available = list(provider_map.keys())
+        raise CycleError(
+            status_code=400,
+            detail=f"Provider '{provider}' not available. Available: {available}",
+        )
+
+    if store is None:
+        raise CycleError(status_code=503, detail="Spine not initialized")
+
+    # Scope names arrive as API input ("SESSION"); enum values are
+    # lowercase. Normalize, and reject unknown scopes with a 400 —
+    # previously the default itself raised an uncaught ValueError.
+    try:
+        scope_enum = ContextScope(scope.lower())
+    except ValueError:
+        raise CycleError(
+            status_code=400,
+            detail=f"Unknown scope '{scope}'. Valid: {[s.value for s in ContextScope]}",
+        ) from None
+
+    # Assemble in-scope context facts
+    context_facts = store.visible_to(scope_enum)
+
+    # Token-efficiency engine (ENGINE-SPEC-v1, as live in MyMilo):
+    # two-tier, cache-stable assembly under a budget derived from the
+    # route registry — never an unbounded context dump — and a
+    # planned output cap instead of a hardcoded max_tokens.
+    from spine.assembly import assemble_context
+    from spine.tokenplan import (
+        ContextOverflowError,
+        estimate_tokens,
+        plan_max_tokens,
+        route_spec,
+    )
+
+    spec = route_spec(provider)
+    summary_fact = next(
+        (f for f in context_facts if f.key.startswith("session-summary:")),
+        None,
+    )
+    summary_text: str | None = None
+    summary_covers = 0
+    assembly_facts = context_facts
+    if summary_fact is not None:
+        summary_text = str(summary_fact.value)
+        assembly_facts = [f for f in context_facts if f is not summary_fact]
+        origin = summary_fact.origin or ""
+        if origin.startswith("compacted:"):
+            try:
+                summary_covers = int(origin.split(":")[1])
+            except (IndexError, ValueError):
+                summary_covers = 0
+
+    budget = max(
+        512,
+        spec.context_window - spec.margin - spec.default_max_tokens,
+    )
+    assembly = assemble_context(
+        assembly_facts,
+        query=intent,
+        summary=summary_text,
+        summary_covers=summary_covers,
+        budget_tokens=budget,
+    )
+    prompt = "\n\n".join(
+        part for part in (assembly.text, f"Transform intent: {intent}") if part
+    )
+    estimated_input = assembly.estimated_tokens + estimate_tokens(intent) + 16
+    try:
+        planned_max = plan_max_tokens(spec, estimated_input)
+    except ContextOverflowError as e:
+        raise CycleError(status_code=400, detail=str(e)) from None
+
+    # Run one gated cycle with the planned output cap
+    result = _run_gated_cycle(provider, prompt, context_facts, max_tokens=planned_max)
+    token_plan = {
+        "route": spec.name,
+        "context_window": spec.context_window,
+        "estimated_input_tokens": estimated_input,
+        "planned_max_tokens": planned_max,
+        "facts_used": assembly.facts_used,
+        "facts_dropped": assembly.facts_dropped,
+    }
+
+    # Record EVERY cycle in the CTST ledger — the ledger is the record
+    # of transformation *attempts* (committed and rejected alike), with
+    # the verdict, gate evidence, and telemetry attached. Before this,
+    # only committed cycles were written, and they were written with
+    # committed=False and no telemetry, so the ledger and the
+    # /telemetry endpoint could never show what actually happened.
+    if ctst_ledger:
+        provider_result: ProviderResult = result["provider_result"]
+        record = CTSTRecord(
+            intent={"summary": intent, "provider": provider},
+            context={f.key: f.value for f in context_facts},
+            mechanism=provider,
+            outcome={"output": result["output"]},
+            assessment={
+                "verdict": result["verdict"],
+                "gates": result["gates"],
+            },
+            error_signal=result["error_signal"],
+            committed=bool(result["committed"]),
+            telemetry={
+                **provider_result.telemetry,
+                "latency_ms": result["latency_ms"],
+                "error_signal": result["error_signal"],
+                "estimated_input_tokens": token_plan["estimated_input_tokens"],
+                "planned_max_tokens": token_plan["planned_max_tokens"],
+                "context_window": token_plan["context_window"],
+                "tool_executions": len(
+                    provider_result.metadata.get("tool_executions", [])
+                ),
+            },
+        )
+        ctst_ledger.append(record)
+
+    return {
+        "intent": intent,
+        "provider": provider,
+        "scope": scope,
+        "output": result["output"],
+        "error_signal": result["error_signal"],
+        "verdict": result["verdict"],
+        "committed": result["committed"],
+        "gates": result["gates"],
+        "token_plan": token_plan,
+        "context_rendered": _render_context(scope_enum),
+    }
+
+
+def build_status() -> dict[str, Any]:
+    """Health+status endpoint."""
+    providers = list(provider_map.keys()) if provider_map else []
+    # Safeguard posture is part of status: count world-writable
+    # files under the project root (the enforceable check in
+    # spine.safeguard) instead of merely asserting safeguards exist.
+    world_writable = -1
+    _root = ""
+    try:
+        from spine.safeguard import get_project_root, world_writable_count
+
+        world_writable = world_writable_count()
+        _root = str(get_project_root())
+    except Exception:
+        pass
+    return {
+        "status": "ok",
+        "providers": providers,
+        "context_size": len(store.visible_to(ContextScope.SESSION)) if store else 0,
+        "ledger_entries": len(ctst_ledger.read()) if ctst_ledger else 0,
+        "safeguards": {
+            "project_root": _root,
+            "world_writable_files": world_writable,
+        },
+        "tools": tool_registry.names() if tool_registry else [],
+        "connectors": connector_registry.names() if connector_registry else [],
+    }
+
+
+def build_mcp_server() -> Any:
+    """Bind the live spine state into an MCP server (see spine.mcp_server).
+
+    Used by POST /mcp and by `spine mcp` (stdio) so agents get the same
+    tools, gates, ledger, and connectors as every other surface.
+    """
+    from spine import __version__ as _pkg_version
+    from spine.mcp_server import MCPServer
+
+    def _context(scope: str) -> dict[str, Any]:
+        try:
+            scope_enum = ContextScope(scope.lower())
+        except ValueError:
+            raise ValueError(
+                f"Unknown scope '{scope}'. Valid: {[s.value for s in ContextScope]}"
+            ) from None
+        return {
+            "scope": scope_enum.value,
+            "rendered": _render_context(scope_enum),
+        }
+
+    def _verify() -> dict[str, Any]:
+        if ctst_ledger is None:
+            raise RuntimeError("Spine not initialized")
+        return {
+            "valid": ctst_ledger.verify_chain(),
+            "head_hash": ctst_ledger.head_hash,
+            "records": len(ctst_ledger.query()),
+        }
+
+    def _connector_execute(
+        connector: str, tool: str, params: dict[str, Any]
+    ) -> dict[str, Any]:
+        if connector_registry is None:
+            raise RuntimeError("Spine not initialized")
+        conn = connector_registry.get(connector)
+        if conn is None:
+            raise ValueError(f"Unknown connector '{connector}'")
+        result = conn.execute(tool, params)
+        return {
+            "connector": connector,
+            "tool": result.tool,
+            "success": result.success,
+            "output": result.output,
+            "error": result.error,
+        }
+
+    connector_tools: list[dict[str, Any]] = []
+    if connector_registry is not None:
+        for name in connector_registry.names():
+            conn = connector_registry.get(name)
+            if conn is None:
+                continue
+            try:
+                caps = conn.declare_capabilities()
+            except Exception:
+                caps = []
+            for cap in caps:
+                connector_tools.append(
+                    {
+                        "connector": name,
+                        "tool": cap.name,
+                        "description": cap.description,
+                        "input_schema": cap.input_schema,
+                    }
+                )
+
+    spine_tools: dict[str, Any] = {}
+    if tool_registry is not None:
+        registry_ref = tool_registry
+        for tool_name in registry_ref.names():
+            spine_tools[tool_name] = (
+                lambda n: lambda args: registry_ref.execute(n, args)
+            )(tool_name)
+
+    return MCPServer(
+        transform=lambda **kw: execute_transform(**kw),
+        status=build_status,
+        context=_context,
+        ledger_verify=_verify,
+        connector_execute=_connector_execute,
+        connector_tools=connector_tools,
+        spine_tools=spine_tools,
+        version=_pkg_version,
+    )
 
 
 def create_app() -> FastAPI:
@@ -327,31 +608,7 @@ def create_app() -> FastAPI:
     @app.get("/api/v1/status")
     async def status() -> dict[str, Any]:
         """Health+status endpoint."""
-        providers = list(provider_map.keys()) if provider_map else []
-        # Safeguard posture is part of status: count world-writable
-        # files under the project root (the enforceable check in
-        # spine.safeguard) instead of merely asserting safeguards exist.
-        world_writable = -1
-        _root = ""
-        try:
-            from spine.safeguard import get_project_root, world_writable_count
-
-            world_writable = world_writable_count()
-            _root = str(get_project_root())
-        except Exception:
-            pass
-        return {
-            "status": "ok",
-            "providers": providers,
-            "context_size": len(store.visible_to(ContextScope.SESSION)) if store else 0,
-            "ledger_entries": len(ctst_ledger.read()) if ctst_ledger else 0,
-            "safeguards": {
-                "project_root": _root,
-                "world_writable_files": world_writable,
-            },
-            "tools": tool_registry.names() if tool_registry else [],
-            "connectors": connector_registry.names() if connector_registry else [],
-        }
+        return build_status()
 
     @app.get("/api/v1/context")  # noqa: F821
     async def context_endpoint() -> JSONResponse:
@@ -366,150 +623,11 @@ def create_app() -> FastAPI:
         provider: str = "llama.cpp",
         scope: str = "SESSION",
     ) -> dict[str, Any]:
-        """Submit a transformation intent and execute the gated cycle.
-
-        Args:
-            intent: What to accomplish (user description).
-            provider: Which Provider adapter to use (registered in lifespan).
-            scope: Context scope to assemble for the prompt.
-
-        Returns:
-            Dict with output, error_signal, verdict, committed flag, and
-            the rendered context.
-        """
-        if provider not in provider_map:
-            available = list(provider_map.keys())
-            raise HTTPException(
-                status_code=400,
-                detail=f"Provider '{provider}' not available. Available: {available}",
-            )
-
-        if store is None:
-            raise HTTPException(status_code=503, detail="Spine not initialized")
-
-        # Scope names arrive as API input ("SESSION"); enum values are
-        # lowercase. Normalize, and reject unknown scopes with a 400 —
-        # previously the default itself raised an uncaught ValueError.
+        """Submit a transformation intent and execute the gated cycle."""
         try:
-            scope_enum = ContextScope(scope.lower())
-        except ValueError:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Unknown scope '{scope}'. "
-                f"Valid: {[s.value for s in ContextScope]}",
-            ) from None
-
-        # Assemble in-scope context facts
-        context_facts = store.visible_to(scope_enum)
-
-        # Token-efficiency engine (ENGINE-SPEC-v1, as live in MyMilo):
-        # two-tier, cache-stable assembly under a budget derived from the
-        # route registry — never an unbounded context dump — and a
-        # planned output cap instead of a hardcoded max_tokens.
-        from spine.assembly import assemble_context
-        from spine.tokenplan import (
-            ContextOverflowError,
-            estimate_tokens,
-            plan_max_tokens,
-            route_spec,
-        )
-
-        spec = route_spec(provider)
-        summary_fact = next(
-            (f for f in context_facts if f.key.startswith("session-summary:")),
-            None,
-        )
-        summary_text: str | None = None
-        summary_covers = 0
-        assembly_facts = context_facts
-        if summary_fact is not None:
-            summary_text = str(summary_fact.value)
-            assembly_facts = [f for f in context_facts if f is not summary_fact]
-            origin = summary_fact.origin or ""
-            if origin.startswith("compacted:"):
-                try:
-                    summary_covers = int(origin.split(":")[1])
-                except (IndexError, ValueError):
-                    summary_covers = 0
-
-        budget = max(
-            512,
-            spec.context_window - spec.margin - spec.default_max_tokens,
-        )
-        assembly = assemble_context(
-            assembly_facts,
-            query=intent,
-            summary=summary_text,
-            summary_covers=summary_covers,
-            budget_tokens=budget,
-        )
-        prompt = "\n\n".join(
-            part for part in (assembly.text, f"Transform intent: {intent}") if part
-        )
-        estimated_input = assembly.estimated_tokens + estimate_tokens(intent) + 16
-        try:
-            planned_max = plan_max_tokens(spec, estimated_input)
-        except ContextOverflowError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from None
-
-        # Run one gated cycle with the planned output cap
-        result = _run_gated_cycle(
-            provider, prompt, context_facts, max_tokens=planned_max
-        )
-        token_plan = {
-            "route": spec.name,
-            "context_window": spec.context_window,
-            "estimated_input_tokens": estimated_input,
-            "planned_max_tokens": planned_max,
-            "facts_used": assembly.facts_used,
-            "facts_dropped": assembly.facts_dropped,
-        }
-
-        # Record EVERY cycle in the CTST ledger — the ledger is the record
-        # of transformation *attempts* (committed and rejected alike), with
-        # the verdict, gate evidence, and telemetry attached. Before this,
-        # only committed cycles were written, and they were written with
-        # committed=False and no telemetry, so the ledger and the
-        # /telemetry endpoint could never show what actually happened.
-        if ctst_ledger:
-            provider_result: ProviderResult = result["provider_result"]
-            record = CTSTRecord(
-                intent={"summary": intent, "provider": provider},
-                context={f.key: f.value for f in context_facts},
-                mechanism=provider,
-                outcome={"output": result["output"]},
-                assessment={
-                    "verdict": result["verdict"],
-                    "gates": result["gates"],
-                },
-                error_signal=result["error_signal"],
-                committed=bool(result["committed"]),
-                telemetry={
-                    **provider_result.telemetry,
-                    "latency_ms": result["latency_ms"],
-                    "error_signal": result["error_signal"],
-                    "estimated_input_tokens": token_plan["estimated_input_tokens"],
-                    "planned_max_tokens": token_plan["planned_max_tokens"],
-                    "context_window": token_plan["context_window"],
-                    "tool_executions": len(
-                        provider_result.metadata.get("tool_executions", [])
-                    ),
-                },
-            )
-            ctst_ledger.append(record)
-
-        return {
-            "intent": intent,
-            "provider": provider,
-            "scope": scope,
-            "output": result["output"],
-            "error_signal": result["error_signal"],
-            "verdict": result["verdict"],
-            "committed": result["committed"],
-            "gates": result["gates"],
-            "token_plan": token_plan,
-            "context_rendered": _render_context(scope_enum),
-        }
+            return execute_transform(intent, provider, scope)
+        except CycleError as e:
+            raise HTTPException(status_code=e.status_code, detail=e.detail) from None
 
     @app.get("/api/v1/ledger")
     async def ledger() -> dict[str, Any]:
@@ -561,6 +679,17 @@ def create_app() -> FastAPI:
             "error": result.error,
             "elapsed_ms": result.elapsed_ms,
         }
+
+    @app.post("/mcp")
+    async def mcp_endpoint(payload: dict[str, Any]) -> Any:
+        """MCP over Streamable HTTP (stateless): one JSON-RPC message in,
+        one out. Notifications (no id) get a 202 with no body."""
+        from fastapi.responses import Response
+
+        response = build_mcp_server().handle(payload)
+        if response is None:
+            return Response(status_code=202)
+        return response
 
     @app.get("/api/v1/telemetry")
     async def telemetry_endpoint() -> dict[str, Any]:

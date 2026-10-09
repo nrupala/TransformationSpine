@@ -201,6 +201,22 @@ def do_connector_execute(name: str, tool: str, params_json: str) -> None:
         print(f"Connector execute error: {e}")
 
 
+def do_mcp() -> None:
+    """Serve the spine to agents over MCP on stdio (subprocess pattern).
+
+    Initializes the same state as the API lifespan, then speaks
+    line-delimited JSON-RPC until stdin closes.
+    """
+    import spine.api as api_module
+    from spine.mcp_server import serve_stdio
+
+    api_module._init_state()
+    try:
+        serve_stdio(api_module.build_mcp_server())
+    finally:
+        api_module._teardown_state()
+
+
 def do_workflow_init(name: str, profile: str, output: str | None) -> None:
     """Execute the workflow init command."""
     from spine.workflow import (
@@ -321,6 +337,9 @@ def main() -> None:
     # spine telemetry
     subparsers.add_parser("telemetry", help="Show aggregated telemetry metrics")
 
+    # spine mcp
+    subparsers.add_parser("mcp", help="Serve the spine over MCP (stdio)")
+
     # spine connector
     connector_parser = subparsers.add_parser(
         "connector", help="Connector discovery and execution"
@@ -413,6 +432,8 @@ def main() -> None:
         do_ledger(verify=args.verify)
     elif args.command == "telemetry":
         do_telemetry()
+    elif args.command == "mcp":
+        do_mcp()
     elif args.command == "connector":
         if args.connector_command == "list":
             do_connector_list()
