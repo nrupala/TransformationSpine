@@ -56,9 +56,7 @@ def test_who_listens_parses_listening_lines(
         "  TCP    127.0.0.1:9001   0.0.0.0:0   LISTENING   4242\n"
         "  TCP    127.0.0.1:9002   0.0.0.0:0   TIME_WAIT   99\n"
     )
-    monkeypatch.setattr(
-        subprocess, "run", lambda *a, **k: _FakeRun(out)
-    )
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: _FakeRun(out))
     lines = portledger.who_listens(9001)
     assert lines is not None and "4242" in lines[0]
     assert portledger.who_listens(7777) is None  # no match -> None
@@ -79,12 +77,8 @@ def test_who_listens_failure_returns_none(
 
 def test_rand_free_skips_busy(monkeypatch: pytest.MonkeyPatch) -> None:
     picks = iter([41001, 41002])
-    monkeypatch.setattr(
-        portledger.random, "randint", lambda a, b: next(picks)
-    )
-    monkeypatch.setattr(
-        portledger, "port_free", lambda p: p == 41002
-    )
+    monkeypatch.setattr(portledger.random, "randint", lambda a, b: next(picks))
+    monkeypatch.setattr(portledger, "port_free", lambda p: p == 41002)
     assert portledger._rand_free() == 41002
 
 
@@ -110,9 +104,7 @@ def test_allocate_records_prior_owner(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     led = _ledger(tmp_path)
-    monkeypatch.setattr(
-        portledger, "who_listens", lambda p: ["  TCP ... LISTENING  7"]
-    )
+    monkeypatch.setattr(portledger, "who_listens", lambda p: ["  TCP ... LISTENING  7"])
     alloc = led.allocate("svc", 0)  # port 0 binds free -> preferred path
     rows = led.status()
     assert rows and rows[0]["prior_owner"] == ["  TCP ... LISTENING  7"]
