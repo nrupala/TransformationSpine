@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """MCP/ACP connectors — fully built, provider-agnostic tool bindings.
 
 Each connector wraps an external service (GitHub, Azure DevOps, Jira,
@@ -198,11 +200,7 @@ class GitHubConnector(MCPConnector):
 
     def _list_repos(self, params: dict[str, Any], start: float) -> ConnectorResult:
         per_page = params.get("per_page", 30)
-        headers = (
-            {"Authorization": f"token {self.token}"}
-            if self.token
-            else {}
-        )
+        headers = {"Authorization": f"token {self.token}"} if self.token else {}
         try:
             import httpx
 
@@ -232,11 +230,18 @@ class GitHubConnector(MCPConnector):
 
     def _create_issue(self, params: dict[str, Any], start: float) -> ConnectorResult:
         headers = (
-            {"Authorization": f"token {self.token}", "Accept": "application/vnd.github.v3+json"}  # noqa: E501
+            {
+                "Authorization": f"token {self.token}",
+                "Accept": "application/vnd.github.v3+json",
+            }  # noqa: E501
             if self.token
             else {}
         )
-        body = {"title": params["title"], "body": params.get("body", ""), "state": "open"}  # noqa: E501
+        body = {
+            "title": params["title"],
+            "body": params.get("body", ""),
+            "state": "open",
+        }  # noqa: E501
         try:
             import httpx
 
@@ -265,11 +270,7 @@ class GitHubConnector(MCPConnector):
             )
 
     def _list_issues(self, params: dict[str, Any], start: float) -> ConnectorResult:
-        headers = (
-            {"Authorization": f"token {self.token}"}
-            if self.token
-            else {}
-        )
+        headers = {"Authorization": f"token {self.token}"} if self.token else {}
         try:
             import httpx
 
@@ -398,15 +399,20 @@ class AzureDevOpsConnector(MCPConnector):
                 return self._list_repos(params, start)
             else:
                 return ConnectorResult(
-                    success=False, tool=tool, output=None,
+                    success=False,
+                    tool=tool,
+                    output=None,
                     error=f"Unknown ADO tool: {tool}",
                     connector=self.name,
                     elapsed_ms=int((time.time() - start) * 1000),
                 )
         except Exception as e:
             return ConnectorResult(
-                success=False, tool=tool, output=None,
-                error=str(e), connector=self.name,
+                success=False,
+                tool=tool,
+                output=None,
+                error=str(e),
+                connector=self.name,
                 elapsed_ms=int((time.time() - start) * 1000),
             )
 
@@ -443,7 +449,9 @@ class AzureDevOpsConnector(MCPConnector):
             elapsed_ms=int((__import__("time").time() - start) * 1000),
         )
 
-    def _create_work_item(self, params: dict[str, Any], start: float) -> ConnectorResult:  # noqa: E501
+    def _create_work_item(
+        self, params: dict[str, Any], start: float
+    ) -> ConnectorResult:  # noqa: E501
         import httpx
 
         headers = {
@@ -452,7 +460,11 @@ class AzureDevOpsConnector(MCPConnector):
         }
         body = [
             {"op": "add", "path": "/fields/System.Title", "value": params["title"]},
-            {"op": "add", "path": "/fields/System.Description", "value": params.get("description", "")},  # noqa: E501
+            {
+                "op": "add",
+                "path": "/fields/System.Description",
+                "value": params.get("description", ""),
+            },  # noqa: E501
         ]
         url = f"{self.service_url}/_apis/wit/workitems/${params['work_item_type']}?api-version=7.0"  # noqa: E501
         resp = httpx.post(url, json=body, headers=headers, timeout=30)
@@ -580,15 +592,20 @@ class JiraConnector(MCPConnector):
                 return self._list_projects(params, start)
             else:
                 return ConnectorResult(
-                    success=False, tool=tool, output=None,
+                    success=False,
+                    tool=tool,
+                    output=None,
                     error=f"Unknown Jira tool: {tool}",
                     connector=self.name,
                     elapsed_ms=int((time.time() - start) * 1000),
                 )
         except Exception as e:
             return ConnectorResult(
-                success=False, tool=tool, output=None,
-                error=str(e), connector=self.name,
+                success=False,
+                tool=tool,
+                output=None,
+                error=str(e),
+                connector=self.name,
                 elapsed_ms=int((time.time() - start) * 1000),
             )
 
@@ -597,6 +614,7 @@ class JiraConnector(MCPConnector):
             from base64 import b64encode
 
             import httpx
+
             auth = b64encode(f"{self.email}:{self.api_token}".encode()).decode()
             resp = httpx.get(
                 f"{self.service_url}/rest/api/2/myself",
@@ -640,12 +658,15 @@ class JiraConnector(MCPConnector):
                 "issuetype": {"name": params["issue_type"]},
                 "summary": params["summary"],
                 "description": params.get("description", ""),
-}
+            }
         }
         resp = httpx.post(
             f"{self.service_url}/rest/api/2/issue",
             json=body,
-            headers={"Authorization": f"Basic {auth}", "Content-Type": "application/json"},  # noqa: E501
+            headers={
+                "Authorization": f"Basic {auth}",
+                "Content-Type": "application/json",
+            },  # noqa: E501
             timeout=30,
         )
         data = resp.json() if resp.status_code == 201 else {}
@@ -667,7 +688,7 @@ class JiraConnector(MCPConnector):
             f"{self.service_url}/rest/api/2/project",
             headers={"Authorization": f"Basic {auth}"},
             timeout=30,
-)
+        )
         data = resp.json() if resp.status_code == 200 else []
         return ConnectorResult(
             success=resp.status_code == 200,
@@ -731,7 +752,10 @@ class ServiceNowConnector(MCPConnector):
                         "short_description": {"type": "string"},
                         "description": {"type": "string"},
                         "category": {"type": "string"},
-                        "priority": {"type": "string", "enum": ["1", "2", "3", "4", "5"]},  # noqa: E501
+                        "priority": {
+                            "type": "string",
+                            "enum": ["1", "2", "3", "4", "5"],
+                        },  # noqa: E501
                     },
                     "required": ["short_description"],
                 },
@@ -1292,6 +1316,8 @@ class ConfluenceConnector(MCPConnector):
 
         if page_id:
             url = f"{self.service_url}/rest/api/content/{page_id}?expand=body.storage,version"  # noqa: E501
+            resp = httpx.get(url, headers=headers, timeout=30)
+            data = resp.json() if resp.status_code == 200 else {}
         elif title and space_key:
             url = f"{self.service_url}/rest/api/content"
             params = {
@@ -1397,4 +1423,3 @@ class ConfluenceConnector(MCPConnector):
             connector=self.name,
             elapsed_ms=int((__import__("time").time() - start) * 1000),
         )
-

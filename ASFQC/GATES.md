@@ -113,3 +113,35 @@ Per BUILD_PLAN.md, each phase must pass G0-G8 with recorded evidence before merg
 ---
 
 *Build plan reference: [BUILD_PLAN.md](../BUILD_PLAN.md) — phased v0.2.0 upgrade with per-phase gate verification.*
+---
+
+## 2026-10-09 — v0.2.0 audit + remediation (append-only correction)
+
+An independent audit of HEAD `ab8e076c` struck the claim "v0.2.0 — all 9
+phases complete, all ASF gates G0–G8 PASS" **as originally evidenced**:
+the phase rows above cite a 36-test run from 2026-09-10 against claims
+(tamper-evident ledger, persistence, profile routing, tool execution,
+workflow execution, telemetry) that behavior testing showed were not
+true of the code. The corrected report stands in the audit record;
+this section records the remediation evidence. The phase rows above
+are left unedited (append-only), but their PASS reading is superseded
+by the findings below until the fixes merge.
+
+Remediation (stacked draft PRs, one per finding family):
+
+| Item | Evidence | Observed |
+|---|---|---|
+| CTST hash chain persisted + verify_chain rewritten + API/CLI verify | `pytest tests/test_ctst_chain.py` | tampered/deleted records fail verification; legacy lines fold in |
+| ContextStore durable backing | `pytest tests/test_store_persistence.py` | PROJECT/PERSISTENT facts survive restart; TRANSIENT never written |
+| Gate-evaluated error signal; telemetry end to end | `pytest tests/test_gates.py tests/test_telemetry.py` | truncated/failed results carry partial/full signal; /telemetry aggregates real records |
+| Token-efficiency engine (planner, assembly, checkpoints) | `pytest tests/test_tokenplan.py` | plan bounded by window−input−margin; over-window input refused pre-send |
+| Profiles route (factory; CLI + API + SPINE_PROFILE) | `pytest tests/test_factory.py` | cloud specs parse (previously dropped); keyless providers skipped |
+| Tool execution loop + tools.yaml | `pytest tests/test_tool_execution.py` | scripted provider's calculator call executed and fed back |
+| Workflow execution; agents; safeguard enforce | `pytest tests/test_workflow_agents.py` | gate blocks commit with no provider; discovery finds 3 skills; enforce strips world-write for real |
+| Coverage (BUILD_PLAN G1 ≥80%) | `pytest --cov=src/spine` | 81% total (was 46% at audit) |
+| Format gate | `ruff format --check src tests spine_cli.py` | clean (added to CI) |
+
+Release coherence: package + API version 0.2.0, CHANGELOG 0.2.0 dated
+2026-10-09. The `v0.2.0` git tag still points at the pre-remediation
+commit `69f7608f`; re-tagging at the merged remediation HEAD is the
+release owner's step after these PRs land.

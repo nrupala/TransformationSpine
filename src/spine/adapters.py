@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Provider adapters — concrete Provider protocol implementations.
 
 Every adapter is stateless: it receives explicit context, makes the call,
@@ -33,10 +35,12 @@ def _context_to_messages(
     if system:
         messages.append({"role": "system", "content": system})
     for fact in sorted(context, key=lambda f: f.key):
-        messages.append({
-            "role": "user",
-            "content": f"[{fact.key}] {fact.value}",
-        })
+        messages.append(
+            {
+                "role": "user",
+                "content": f"[{fact.key}] {fact.value}",
+            }
+        )
     return messages
 
 
@@ -54,7 +58,7 @@ class LlamaCppProvider:
         self.name = "llama.cpp"
         self.endpoint = endpoint.rstrip("/")
         self.model = model
-        self.client = httpx.Client(timeout=120.0)
+        self.client = httpx.Client(timeout=120.0, trust_env=False)
 
     def list_models(self) -> list[str]:
         """Query the router's /v1/models."""
@@ -102,8 +106,7 @@ class LlamaCppProvider:
                 model=model or self.model,
                 error_signal=1.0,
                 finished_reason="error",
-                metadata={"status_code": resp.status_code,
-                          "body": resp.text[:500]},
+                metadata={"status_code": resp.status_code, "body": resp.text[:500]},
             )
 
         data = resp.json()
@@ -178,7 +181,7 @@ class OllamaProvider:
         self.name = "ollama"
         self.endpoint = endpoint.rstrip("/")
         self.model = model
-        self.client = httpx.Client(timeout=120.0)
+        self.client = httpx.Client(timeout=120.0, trust_env=False)
 
     def list_models(self) -> list[str]:
         resp = self.client.get(f"{self.endpoint}/models")
@@ -427,8 +430,7 @@ class HuggingFaceProvider:
                 model=model or self.model,
                 error_signal=1.0,
                 finished_reason="error",
-                metadata={"status_code": resp.status_code,
-                          "body": resp.text[:500]},
+                metadata={"status_code": resp.status_code, "body": resp.text[:500]},
             )
 
         data = resp.json()
@@ -567,7 +569,13 @@ class HuggingFaceLocalProvider:
             tool_calls=[],
         )
 
-    def embed(self, text: str, model: str | None = None) -> list[float]:
+    def embed(
+        self,
+        text: str,
+        model: str | None = None,
+        *,
+        allow_hash_fallback: bool = False,
+    ) -> list[float]:
         import torch
 
         model_name = model or self.model_id
@@ -594,6 +602,20 @@ class HuggingFaceLocalProvider:
                     emb = last_hidden.mean(dim=1).squeeze()
                     return [float(x) for x in emb.tolist()]
             except Exception:
-                # Ultimate fallback: hash-based embedding (deterministic, always works)
-                h = hash(text)
-                return [((h >> i) & 0xFF) / 255.0 for i in range(768)][:64]
+                # No real embedding backend is available. The previous
+                # fallback silently returned a pseudo-embedding built from
+                # Python's salted hash() — not a semantic vector, and not
+                # even deterministic across processes. Refuse loudly
+                # unless the caller explicitly opted into the hash vector.
+                if not allow_hash_fallback:
+                    raise RuntimeError(
+                        "No embedding backend available (sentence-transformers "
+                        "and transformers both failed to load). Refusing to "
+                        "return a pseudo-embedding; pass "
+                        "allow_hash_fallback=True if a deterministic "
+                        "non-semantic hash vector is really what you want."
+                    ) from None
+                import hashlib
+
+                digest = hashlib.sha256(text.encode()).digest()
+                return [b / 255.0 for b in digest] + [0.0] * 32

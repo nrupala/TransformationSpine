@@ -40,9 +40,7 @@ def test_chain_links_and_verifies(tmp_path: Path) -> None:
     led = CTSTLedger(root=tmp_path)
     led.append(_record("one"))
     led.append(_record("two"))
-    lines = [
-        json.loads(x) for x in _ledger_file(tmp_path).read_text().splitlines()
-    ]
+    lines = [json.loads(x) for x in _ledger_file(tmp_path).read_text().splitlines()]
     assert lines[1]["prev_hash"] == lines[0]["record_hash"]
     assert led.verify_chain() is True
     assert led.head_hash == lines[1]["record_hash"]
@@ -56,9 +54,7 @@ def test_chain_survives_restart_and_continues(tmp_path: Path) -> None:
     led2 = CTSTLedger(root=tmp_path)  # fresh process view of same files
     assert led2.verify_chain() is True
     led2.append(_record("three"))
-    lines = [
-        json.loads(x) for x in _ledger_file(tmp_path).read_text().splitlines()
-    ]
+    lines = [json.loads(x) for x in _ledger_file(tmp_path).read_text().splitlines()]
     assert lines[2]["prev_hash"] == lines[1]["record_hash"]
     assert led2.verify_chain() is True
 

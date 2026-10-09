@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: Apache-2.0
 """Context lifecycle scoping — the transformation spine's core data model.
 
 Context is contextual to its usage. This module formalizes that insight as an
@@ -110,12 +112,8 @@ class ContextFact:
     scope: ContextScope
     origin: str = ""
     owner: str = ""
-    created_at: datetime = field(
-        default_factory=lambda: datetime.now(UTC)
-    )
-    last_accessed: datetime = field(
-        default_factory=lambda: datetime.now(UTC)
-    )
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_accessed: datetime = field(default_factory=lambda: datetime.now(UTC))
     id: str = field(default_factory=lambda: str(uuid4()))
 
     def is_expired(self, now: datetime | None = None) -> bool:

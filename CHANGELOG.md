@@ -2,13 +2,45 @@
 
 All notable changes to Transformation Spine are recorded here.
 
-## [0.2.0] - UNRELEASED (planned)
+## [Unreleased]
+
+### Added
+
+- **Connector plugin auto-discovery** — the 0.2.0 note below ("plugin
+  auto-discovery was planned but is not implemented") is superseded:
+  connectors now register three ways into one registry — built-ins,
+  the `spine.connectors` entry-point group (any installed
+  distribution), and plugin directories (`SPINE_CONNECTOR_PATH` env
+  var or a local `connectors/` directory). Broken plugins are
+  reported and skipped, never fatal. Configuration is uniform:
+  `SPINE_CONNECTOR_<NAME>_<PARAM>` env vars feed constructor params.
+  Surfaces: `GET /api/v1/connectors`,
+  `POST /api/v1/connectors/{name}/execute`,
+  `spine connector list|execute`.
+- **MCP server surface** — `POST /mcp` (Streamable HTTP, stateless)
+  and `spine mcp` (stdio). Tools: `spine_transform`, `spine_status`,
+  `spine_context`, `spine_ledger_verify`, `spine_connector_execute`,
+  one per connector capability (`<connector>__<tool>`), built-ins.
+- **A2A + ACP agent surfaces and a browser UI** — A2A agent card at
+  `/.well-known/agent-card.json`, JSON-RPC `message/send`/`tasks/get`
+  at `POST /a2a`; ACP `GET /acp/agents`,
+  `POST /acp/agents/{name}/runs`, `GET .../runs/{id}`; humans get
+  `GET /ui`. Every surface runs the one gated cycle
+  (`docs/serving.md` maps them all).
+
+### Changed
+
+- **portledger at 100% coverage** (was 61%; repo total ~83%).
+- `scripts/safeguard.sh` is committed executable (mode 100755); the
+  original API-based push could not set the exec bit.
+
+## [0.2.0] - 2026-10-09
 
 ### Added — Upgrade scope per BUILD_PLAN.md
 
 #### Multi-backend adapters (Phase 1)
 - `HuggingFaceProvider` adapter for HuggingFace Inference API + local transformers
-- Skill-level backend abstraction — adapters at the "skill" level, not just primitive inference calls
+- Provider factory (`spine.factory`) building adapters from profile-aware `Providers.yaml` specs
 - `Providers.yaml` template with local/cloud/hybrid model groups
 - Provider factory with profile-aware resolution (local/cloud/hybrid)
 
@@ -16,13 +48,12 @@ All notable changes to Transformation Spine are recorded here.
 - `ServiceNowConnector` — incident, change, CMDB, service catalog
 - `DatabricksConnector` — SQL endpoints, MLflow, workspace objects
 - `ConfluenceConnector` — pages, spaces, attachments
-- Plugin-based connector discovery (auto-load connectors from connectors/ directory)
-- `MCPConnector` base class extended with `service_name` + `service_type` metadata
+- All six connectors exported from the package and covered by mock-transport tests (plugin auto-discovery was planned but is not implemented; connectors register by import)
 
 #### Audit logs & telemetry (Phase 3)
 - `ProviderResult.telemetry` dict for prompt/token/latency metrics
 - `/telemetry` FastAPI endpoint — JSON aggregation of usage, latency, convergence
-- `ContextStore` metrics — promote/demote counts, scope transitions
+- `ContextStore` durable backing — facts in persisted scopes survive restarts (JSON, atomic write)
 - CTST ledger already append-only (audit trail); telemetry extends with analytics
 
 #### Local/cloud/hybrid profiles (Phase 4)
@@ -35,14 +66,14 @@ All notable changes to Transformation Spine are recorded here.
 - `spine_cli workflow init --name "myflow"` — generates Mermaid `.mmd` file
 - Workflow parser validates node/edge semantics
 - Mermaid syntax validation
-- Workflow module (`src/spine/workflow/`) — DAG execution engine
+- Workflow module (`src/spine/workflow/`) — DAG execution engine (topological order, cycle detection, gate enforcement) with `spine workflow run`
 - `docs/workflows.md` — workflow guide with examples
 
 #### Prebuilt agent libraries (Phase 6)
 - `code-review-agent` — wraps code-reviewer skill on transformation output
 - `test-generator-agent` — produces pytest cases from function signatures
 - `prompt-optimizer-agent` — auto-tunes prompts for better convergence
-- `rag-pipeline-agent` — vector-retrieve from Qdrant, feed into complete()
+- `rag-pipeline-agent` — lexical retrieval (token-overlap scoring) over a supplied corpus; no vector backend is bundled
 - Skills registered in `skill_registry/_index.md` with verified status
 
 #### Enterprise integrations roadmap (Phase 7)
@@ -58,10 +89,41 @@ All notable changes to Transformation Spine are recorded here.
 - Interoperability with LangGraph/Orca-style function calling
 
 #### OS-level safeguarding (Phase 9)
-- `scripts/safeguard.sh` — sets least-privilege file permissions
-- Read-only source directories, write-restricted paths
-- Backup-before-write integration verification
-- WSL/bwrap sandboxing without Docker per standing rule §10
+- `scripts/safeguard.sh` — runs the safeguard check/enforce CLI
+- `enforce_safeguards` strips world-writable permissions across the project tree and reports only changes actually applied
+- Safeguard posture (world-writable count) reported by `GET /api/v1/status`
+
+### Audit remediation (2026-10-09) — fixes for the v0.2 claim audit
+
+An independent audit struck the original "all phases complete, G0–G8 PASS"
+claim; this release contains the remediation, each fix behavior-tested:
+
+- **CTST tamper evidence (was inert):** hash chain is persisted per record,
+  `verify_chain()` rewritten and exposed via `GET /api/v1/ledger/verify`
+  and `spine ledger --verify`; tamper tests prove edited records fail.
+- **Context persistence (was in-memory only):** durable store backing;
+  promote/demote preserve provenance and creation time.
+- **Convergence (was binary):** caller-side gate evaluation
+  (`spine.gates`) computes the error signal deterministically; every
+  transform cycle is ledgered with verdict, gates, and telemetry.
+- **Token-efficiency engine:** route registry + token planner
+  (`spine.tokenplan`), two-tier cache-stable context assembly
+  (`spine.assembly`), session compaction checkpoints — ported from
+  ENGINE-SPEC-v1 (the engine running live in MyMilo v0.35–v0.37).
+- **Profiles (were decorative):** `spine.factory` builds providers per
+  profile; CLI and API (SPINE_PROFILE) route through Routing.yaml.
+- **Tool calls (were parsed, never run):** `spine.tools` registry +
+  execution loop with `tools.yaml`; executions recorded in telemetry.
+- **Workflow (was authoring-only):** execution engine with gates;
+  `workflow init` also writes the documented `.mmd` file.
+- **Agents (discovery/invoke were broken):** skills resolve from the
+  repo root, doc-skills load via `instructions()`, `generate_tests`
+  generates from the module's real AST, prompt-optimizer and lexical
+  RAG agents implemented.
+- **Release coherence:** package/API version 0.2.0 (was 0.1.0 in code),
+  coverage ≥80% enforced in CI, `ruff format` checked in CI, license
+  headers on all sources, local adapters ignore proxy env
+  (`trust_env=False`), missing promised docs/files restored.
 
 ### Changed
 - All phases maintain ASF gate compliance (G0-G8) with recorded evidence

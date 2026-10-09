@@ -79,19 +79,19 @@ All OpenAI-compatible adapters (LlamaCppProvider, OpenAIProvider, OllamaProvider
 
 ```python
 provider = LlamaCppProvider()
-tools = [{
-    "type": "function",
-    "function": {
-        "name": "compute",
-        "description": "Compute a mathematical expression",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "expression": {"type": "string"}
-            }
-        }
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "compute",
+            "description": "Compute a mathematical expression",
+            "parameters": {
+                "type": "object",
+                "properties": {"expression": {"type": "string"}},
+            },
+        },
     }
-}]
+]
 
 result = provider.complete(
     prompt="What is 2+2?",
