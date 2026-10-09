@@ -33,7 +33,7 @@ commands.
 ### `Could not connect to llama.cpp on :8830`
 The local engine stack is down. Start it via the llama-control supervisor:
 ```powershell
-pwsh C:\Users\nrupa\.config\opencode\local-engines\llama-control.ps1 -Start
+pwsh C:\Users\<you>\.config\opencode\local-engines\llama-control.ps1 -Start
 ```
 The watchdog (`-Watchdog`, auto-spawned by the control server) heals
 mesh/orchestrator/embeddings/router within ~10s if they die.

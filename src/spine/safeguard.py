@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """OS-level safeguarding for TransformationSpine.
 
 Ensures the spine process runs with least-privilege file access

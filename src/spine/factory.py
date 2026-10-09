@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Provider factory — profiles and routing that actually take effect.
 
 Audit F-06: Providers.yaml / Routing.yaml existed and RouterRule could

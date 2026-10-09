@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Tool registry and execution loop — tool calls that actually run.
 
 Audit F-10: adapters parsed ``tool_calls`` out of provider responses

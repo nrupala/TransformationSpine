@@ -1,8 +1,8 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 r"""CTST ledger — Context-Tracked State Transition durable journal.
 
-Ported from the OCS repos' concepts (D:\ocs-software, D:\ocscoder) but
+Ported from the OCS projects' concepts but
 implemented fresh for the TransformationSpine stack. The CTST ledger is
 the immutable record of every transformation attempt, enabling:
 

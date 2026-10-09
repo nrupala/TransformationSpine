@@ -1,3 +1,5 @@
+# Copyright 2026 Nrupal Akolkar
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Connector plugin auto-discovery.
 
 The v0.2 CHANGELOG promised plugin-based connector discovery; until

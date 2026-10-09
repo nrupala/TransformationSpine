@@ -43,3 +43,11 @@ the tree has no scratch files, secrets, or unrelated changes.
 See `CODE_OF_CONDUCT.md`. In short: be professional, assume good faith, and
 treat safety-critical discipline as the baseline — this project targets
 high-assurance systems.
+
+## License of contributions
+
+By submitting a contribution you agree that it is licensed under the
+project's open-source license (AGPL-3.0-or-later, see `LICENSE`) and
+that the copyright holder may also offer it under the project's
+commercial license (see `LICENSE-COMMERCIAL.md`). This keeps the
+dual-licensing path intact for every contribution.

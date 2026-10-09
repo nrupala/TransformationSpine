@@ -5,7 +5,7 @@ type: skill
 status: verified
 created: 2026-09-08
 tags: [code-review, agents, spine, transformation, testing]
-location: D:\TransformationSpine\skills\code-review-agent\SKILL.md
+location: skills/code-review-agent/SKILL.md
 ---
 
 # Code Review Agent
