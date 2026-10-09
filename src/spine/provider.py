@@ -79,20 +79,17 @@ class ModelSpec:
 
     @classmethod
     def from_yaml(cls, data: dict[str, Any]) -> list[ModelSpec]:
-        """Build ModelSpecs from the repo's ``Providers.yaml`` shape."""
+        """Build ModelSpecs from the repo's ``Providers.yaml`` shape.
+
+        Returns specs across ALL profiles. (The previous implementation
+        iterated only flat sections and silently dropped the nested
+        cloud/hybrid provider dicts — most of the file never parsed.)
+        """
+        from .factory import parse_provider_specs
+
         specs: list[ModelSpec] = []
-        for provider_name, cfg in (data.get("providers") or {}).items():
-            endpoint = cfg.get("endpoint", "")
-            strengths = tuple(cfg.get("strengths", []))
-            for model in cfg.get("models", []):
-                specs.append(
-                    ModelSpec(
-                        provider=provider_name,
-                        model=model,
-                        strengths=strengths,
-                        endpoint=endpoint,
-                    )
-                )
+        for profile_specs in parse_provider_specs(data).values():
+            specs.extend(profile_specs)
         return specs
 
 
@@ -113,7 +110,17 @@ class RouterRule:
 
     @classmethod
     def from_yaml(cls, cfg: dict[str, Any], profile: str = "local") -> list[RouterRule]:
-        """Build rules from the repo's ``Routing.yaml`` shape with profile selection."""
+        """Build rules from the repo's ``Routing.yaml`` shape with profile selection.
+
+        Provider names are canonicalized (Routing.yaml says "local";
+        adapters register as "llama.cpp") so a rule's provider can be
+        looked up in a provider map without a translation step.
+        """
+        from .factory import canonical_provider
+
+        def canon(name: str) -> str:
+            return canonical_provider(name) if name else ""
+
         rules: list[RouterRule] = []
         # Support both flat structure (legacy) and profile-aware structure
         if profile in cfg.get("routes", {}):
@@ -127,9 +134,9 @@ class RouterRule:
                 rules.append(
                     cls(
                         task=task,
-                        primary_provider=primary.get("provider", ""),
+                        primary_provider=canon(primary.get("provider", "")),
                         primary_model=primary.get("model", ""),
-                        fallback_provider=fallback.get("provider", ""),
+                        fallback_provider=canon(fallback.get("provider", "")),
                         fallback_model=fallback.get("model", ""),
                     )
                 )
@@ -139,7 +146,7 @@ class RouterRule:
                     rules.append(
                         cls(
                             task=task,
-                            primary_provider=local_fallback.get("provider", ""),
+                            primary_provider=canon(local_fallback.get("provider", "")),
                             primary_model=local_fallback.get("model", ""),
                             min_scope=ContextScope.PROJECT,
                         )
@@ -152,9 +159,9 @@ class RouterRule:
                 rules.append(
                     cls(
                         task=task,
-                        primary_provider=primary.get("provider", ""),
+                        primary_provider=canon(primary.get("provider", "")),
                         primary_model=primary.get("model", ""),
-                        fallback_provider=fallback.get("provider", ""),
+                        fallback_provider=canon(fallback.get("provider", "")),
                         fallback_model=fallback.get("model", ""),
                     )
                 )

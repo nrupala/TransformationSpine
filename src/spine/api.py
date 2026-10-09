@@ -139,9 +139,45 @@ async def lifespan(app: Any) -> Any:
     )
     ctst_ledger = CTSTLedger()
 
-    # Register LlamaCppProvider (connects to :8830 OpenAI-compatible router)
+    # Register providers for the active profile (SPINE_PROFILE env,
+    # default "local") from Providers.yaml via the factory, when the
+    # file is present. Profiles genuinely select: cloud registers the
+    # keyed cloud adapters, hybrid registers local + cloud, local only
+    # the llama.cpp route. Without a Providers.yaml, fall back to the
+    # historical env-driven registration below.
     op_logger = get_logger("spine")
     oplog(op_logger, "spine starting")
+    profile = os.environ.get("SPINE_PROFILE", "local")
+    providers_yaml = os.path.join(os.getcwd(), "Providers.yaml")
+    if os.path.exists(providers_yaml):
+        try:
+            import yaml as _yaml
+
+            from spine.factory import build_provider_map
+
+            with open(providers_yaml, encoding="utf-8") as f:
+                providers_data = _yaml.safe_load(f) or {}
+            for name, instance in build_provider_map(profile, providers_data).items():
+                if name == "llama.cpp":
+                    models = instance.list_models()
+                    if not models:
+                        oplog(
+                            op_logger,
+                            "llama.cpp handshake: no models returned",
+                            level=30,
+                            provider="llama.cpp",
+                        )
+                        continue
+                provider_map[name] = instance
+                oplog(op_logger, "provider registered", provider=name, profile=profile)
+        except Exception as e:
+            oplog(op_logger, "profile provider load failed", level=40,
+                  profile=profile, error=str(e))
+        yield
+        store = None
+        ctst_ledger = None
+        provider_map.clear()
+        return
     try:
         # Default: Qwen3.5-9B-Q8_0 — verified tool-capable (structured
         # tool_calls, finish_reason=tool_calls) per the 2026-09-13 local

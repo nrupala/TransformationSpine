@@ -32,6 +32,12 @@ from .context import (
     declare,
 )
 from .ctst import CTSTLedger, CTSTRecord
+from .factory import (
+    build_provider_map,
+    canonical_provider,
+    parse_provider_specs,
+    select_for_task,
+)
 from .gates import GateCheck, GateReport, evaluate_result
 from .provider import ModelSpec, Provider, RouterRule
 from .result import ProviderResult
@@ -66,6 +72,10 @@ __all__ = [
     "snapshot_for_prompt",
     "CTSTRecord",
     "CTSTLedger",
+    "build_provider_map",
+    "canonical_provider",
+    "parse_provider_specs",
+    "select_for_task",
     "GateCheck",
     "GateReport",
     "evaluate_result",

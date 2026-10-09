@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 from pathlib import Path
 from typing import Any
 
@@ -24,8 +23,6 @@ import httpx
 import yaml
 
 from spine import ContextStore
-from spine.adapters import LlamaCppProvider, OpenAIProvider
-from spine.provider import Provider
 
 # Global spine instances (shared across CLI commands)
 _spine_app = None
@@ -35,37 +32,27 @@ _profile: str = "local"
 
 
 def load_env_config(profile: str = "local") -> None:
-    """Load configuration from Providers.yaml if present."""
+    """Load the providers a profile declares, via the spine factory.
+
+    The profile genuinely selects: local builds the llama.cpp route,
+    cloud builds OpenAI/Anthropic/HuggingFace (skipping any whose API
+    key is unset), hybrid builds both local and cloud primaries.
+    (Previously this iterated profile names as if they were provider
+    names and loaded nothing at all.)
+    """
     config_path = Path("Providers.yaml")
     if not config_path.exists():
         return
 
     with open(config_path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
+        data = yaml.safe_load(f) or {}
+
+    from spine.factory import build_provider_map
 
     global _spine_providers
-    for provider_name, cfg in (data.get("providers") or {}).items():
-        endpoint = cfg.get("endpoint", "")
-        if endpoint:
-            try:
-                provider: Provider | None = None
-                if provider_name == "openai" or provider_name == "anthropic":
-                    api_key = os.environ.get("OPENAI_API_KEY") or os.environ.get(
-                        "ANTHROPIC_API_KEY"
-                    )
-                    if api_key:
-                        provider = OpenAIProvider(
-                            api_key=api_key,
-                            endpoint=endpoint,
-                        )
-                elif provider_name == "llama.cpp":
-                    provider = LlamaCppProvider(endpoint=endpoint)
-
-                if provider is not None:
-                    _spine_providers[provider_name] = provider
-                    print(f"Loaded provider: {provider_name}")
-            except Exception as e:
-                print(f"Could not load provider {provider_name}: {e}")
+    _spine_providers = build_provider_map(profile, data)
+    for name in _spine_providers:
+        print(f"Loaded provider: {name} (profile={profile})")
 
 
 def load_routing_config(profile: str = "local") -> dict[str, Any]:
@@ -106,7 +93,24 @@ def do_transform(
     intent: str, provider: str, scope: str, profile: str
 ) -> None:
     """Execute the transform command."""
-    _ = profile  # Profile for future use in provider selection
+    # The profile selects the provider through Routing.yaml when the
+    # caller left the provider at its default: e.g. --profile cloud
+    # routes the coding task to the cloud primary instead of llama.cpp.
+    if provider == "llama.cpp" and profile != "local":
+        routing = load_routing_config(profile)
+        from spine.factory import select_for_task
+        from spine.provider import RouterRule
+
+        rules = RouterRule.from_yaml(routing, profile=profile)
+        rule = select_for_task(rules, "coding")
+        if rule is not None and rule.primary_provider:
+            from spine.factory import canonical_provider
+
+            provider = canonical_provider(rule.primary_provider)
+            print(
+                f"Profile '{profile}' routes coding -> {provider} "
+                f"({rule.primary_model})"
+            )
 
     try:
         resp = httpx.post(
