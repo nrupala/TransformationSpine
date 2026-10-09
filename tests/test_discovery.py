@@ -14,7 +14,7 @@ import pytest
 
 from spine.discovery import ConnectorRegistry, discover_connectors
 
-_PLUGIN = '''
+_PLUGIN = """
 from spine.connectors import ConnectorResult, MCPConnector, ToolDef
 
 
@@ -33,7 +33,7 @@ class EchoConnector(MCPConnector):
 
     def health_check(self):
         return True
-'''
+"""
 
 _BROKEN = "raise RuntimeError('plugin exploded on import')\n"
 
@@ -53,9 +53,7 @@ def test_builtin_discovery() -> None:
 
 def test_directory_plugin_discovered_and_executed(tmp_path: Path) -> None:
     (tmp_path / "echo_conn.py").write_text(_PLUGIN)
-    result = discover_connectors(
-        search_paths=[tmp_path], include_entry_points=False
-    )
+    result = discover_connectors(search_paths=[tmp_path], include_entry_points=False)
     assert "echo-test" in result.connectors
     registry = ConnectorRegistry(result)
     conn = registry.get("echo-test")
@@ -71,9 +69,7 @@ def test_directory_plugin_discovered_and_executed(tmp_path: Path) -> None:
 def test_broken_plugin_reported_not_fatal(tmp_path: Path) -> None:
     (tmp_path / "bad_conn.py").write_text(_BROKEN)
     (tmp_path / "echo_conn.py").write_text(_PLUGIN)
-    result = discover_connectors(
-        search_paths=[tmp_path], include_entry_points=False
-    )
+    result = discover_connectors(search_paths=[tmp_path], include_entry_points=False)
     assert "echo-test" in result.connectors
     assert any("plugin exploded" in e for e in result.errors)
 
@@ -93,12 +89,11 @@ def test_env_var_path_and_config(
 
 def test_duplicate_names_keep_first(tmp_path: Path) -> None:
     (tmp_path / "dupe.py").write_text(
-        _PLUGIN.replace('name = "echo-test"', 'name = "github"')
-        .replace("EchoConnector", "DupeConnector")
+        _PLUGIN.replace('name = "echo-test"', 'name = "github"').replace(
+            "EchoConnector", "DupeConnector"
+        )
     )
-    result = discover_connectors(
-        search_paths=[tmp_path], include_entry_points=False
-    )
+    result = discover_connectors(search_paths=[tmp_path], include_entry_points=False)
     assert result.connectors["github"].__name__ == "GitHubConnector"
     assert any("already registered" in s for s in result.skipped)
 

@@ -193,9 +193,7 @@ class ConnectorRegistry:
             try:
                 self._instances[name] = cls(**_env_config(name, cls))
             except Exception as e:
-                self.instantiation_errors.append(
-                    f"{name}: {type(e).__name__}: {e}"
-                )
+                self.instantiation_errors.append(f"{name}: {type(e).__name__}: {e}")
 
     @classmethod
     def discover(cls, **kwargs: Any) -> ConnectorRegistry:
