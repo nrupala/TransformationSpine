@@ -4,7 +4,16 @@ All notable changes to Transformation Spine are recorded here.
 
 ## [Unreleased]
 
-(empty)
+### Changed
+
+- **License: Apache-2.0 → AGPL-3.0-or-later + commercial dual
+  licensing.** `LICENSE` is now the GNU AGPL v3 text;
+  `LICENSE-COMMERCIAL.md` sets out the commercial license path
+  (available from the copyright holder on request). SPDX headers,
+  NOTICE, and package metadata updated to match; a `SECURITY.md`
+  was added and local machine paths were removed from docs and
+  headers. Releases up to and including v0.2.0 remain under the
+  Apache License 2.0 as published.
 
 ## [0.2.0] - 2026-10-09
 

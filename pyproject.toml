@@ -8,13 +8,13 @@ version = "0.2.0"
 description = "Provider-neutral transformation spine: context lifecycle, provider abstraction, and outcome convergence."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { text = "Apache-2.0" }
+license = { text = "AGPL-3.0-or-later" }
 authors = [{ name = "Nrupal Akolkar" }]
 keywords = ["context-lifecycle", "provider-agnostic", "oc-systems", "outcome-convergence"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: Apache Software License",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",

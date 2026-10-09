@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """ContextStore — the spine's memory manager.
 
 Holds every ContextFact by scope, enforces expiry, and exposes the scoping

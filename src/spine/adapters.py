@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Provider adapters — concrete Provider protocol implementations.
 
 Every adapter is stateless: it receives explicit context, makes the call,

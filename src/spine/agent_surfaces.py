@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Agent-protocol surfaces: A2A and ACP, over the same gated cycle.
 
 The spine serves three kinds of callers, and these are the agent ones

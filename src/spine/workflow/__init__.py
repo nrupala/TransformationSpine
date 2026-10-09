@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Workflow module — Mermaid-based graphical workflow authoring.
 
 This module complements script writing by allowing users to define workflows as
