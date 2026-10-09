@@ -166,6 +166,41 @@ def do_telemetry() -> None:
         print(f"Telemetry request error: {e}")
 
 
+def do_connector_list() -> None:
+    """List discovered connectors via the API."""
+    try:
+        resp = httpx.get("http://127.0.0.1:8000/api/v1/connectors", timeout=5.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            for conn in data["connectors"]:
+                caps = ", ".join(conn["capabilities"])
+                print(f"  {conn['name']} [{conn['source']}] tools: {caps}")
+            for err in data.get("discovery_errors", []):
+                print(f"  discovery error: {err}")
+        else:
+            print(f"Connector request failed: {resp.status_code}")
+    except Exception as e:
+        print(f"Connector request error: {e}")
+
+
+def do_connector_execute(name: str, tool: str, params_json: str) -> None:
+    """Execute one connector tool via the API."""
+    try:
+        params = json.loads(params_json) if params_json else {}
+    except json.JSONDecodeError as e:
+        print(f"Invalid --params JSON: {e}")
+        return
+    try:
+        resp = httpx.post(
+            f"http://127.0.0.1:8000/api/v1/connectors/{name}/execute",
+            json={"tool": tool, "params": params},
+            timeout=30.0,
+        )
+        print(json.dumps(resp.json(), indent=2, default=str))
+    except Exception as e:
+        print(f"Connector execute error: {e}")
+
+
 def do_workflow_init(name: str, profile: str, output: str | None) -> None:
     """Execute the workflow init command."""
     from spine.workflow import (
@@ -286,6 +321,21 @@ def main() -> None:
     # spine telemetry
     subparsers.add_parser("telemetry", help="Show aggregated telemetry metrics")
 
+    # spine connector
+    connector_parser = subparsers.add_parser(
+        "connector", help="Connector discovery and execution"
+    )
+    connector_sub = connector_parser.add_subparsers(
+        dest="connector_command", required=True
+    )
+    connector_sub.add_parser("list", help="List discovered connectors")
+    exec_parser = connector_sub.add_parser("execute", help="Execute a connector tool")
+    exec_parser.add_argument("name", type=str, help="Connector name")
+    exec_parser.add_argument("tool", type=str, help="Tool name")
+    exec_parser.add_argument(
+        "--params", type=str, default="{}", help="Tool params as JSON"
+    )
+
     # spine transform
     transform_parser = subparsers.add_parser(
         "transform", help="Submit a transformation intent"
@@ -363,6 +413,11 @@ def main() -> None:
         do_ledger(verify=args.verify)
     elif args.command == "telemetry":
         do_telemetry()
+    elif args.command == "connector":
+        if args.connector_command == "list":
+            do_connector_list()
+        elif args.connector_command == "execute":
+            do_connector_execute(args.name, args.tool, args.params)
     elif args.command == "provider":
         load_env_config(_profile)
         do_provider_list()
