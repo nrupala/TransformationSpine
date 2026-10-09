@@ -1,8 +1,8 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
-# Vendored from D:\research\port-ledger (PortLedger v0.1.0, tag v0.1.0).
-# Source of record: D:\research\port-ledger\portledger.py — keep in sync there.
-# License: Apache-2.0. Stdlib-only.
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Vendored from PortLedger v0.1.0 (tag v0.1.0), a companion project
+# by the same author; the port-ledger source of record is canonical.
+# License: AGPL-3.0-or-later. Stdlib-only.
 """portledger — dynamic port allocation with conflict resolution and record keeping.
 
 A small, dependency-free (stdlib only) library + CLI for services that must

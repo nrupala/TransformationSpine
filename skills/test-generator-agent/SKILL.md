@@ -5,7 +5,7 @@ type: skill
 status: verified
 created: 2026-09-08
 tags: [test-generation, agents, spine, pytest]
-location: D:\TransformationSpine\skills\test-generator-agent\SKILL.md
+location: skills/test-generator-agent/SKILL.md
 ---
 
 # Test Generator Agent

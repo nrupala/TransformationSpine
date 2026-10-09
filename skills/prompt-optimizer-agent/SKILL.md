@@ -5,7 +5,7 @@ type: skill
 status: verified
 created: 2026-09-08
 tags: [prompt-optimization, agents, spine, optimization]
-location: D:\TransformationSpine\skills\prompt-optimizer-agent\SKILL.md
+location: skills/prompt-optimizer-agent/SKILL.md
 ---
 
 # Prompt Optimizer Agent

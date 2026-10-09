@@ -23,7 +23,7 @@ retires the ephemeral — without the model ever owning memory.
 
 ## Outcome Convergence
 
-From the OCS repos (`D:\ocs-software`, `D:\ocscoder`): every transformation is
+From the OCS projects: every transformation is
 a gated cycle. The spine computes an error signal per provider result; a
 result converges when the gap to the committed artifact is zero. This is what
 makes a 8B llama.cpp model and a 70B Codex model converge to the same outcome —
@@ -89,3 +89,18 @@ OS-level safeguarding in place. All ASF gates G0-G8 PASS with recorded evidence.
 <!-- coffee-support -->
 ## Support
 <a href="https://buymeacoffee.com/nrupalakolt" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" style="height:40px;" /></a>
+
+## License
+
+TransformationSpine is dual-licensed by its copyright holder,
+Nrupal Akolkar:
+
+- **Open source:** GNU Affero General Public License, version 3 or
+  later (AGPL-3.0-or-later) — see [`LICENSE`](LICENSE).
+- **Commercial:** a commercial license is available for proprietary
+  or hosted use without AGPL obligations — see
+  [`LICENSE-COMMERCIAL.md`](LICENSE-COMMERCIAL.md).
+
+Releases up to and including **v0.2.0** were published under the
+Apache License 2.0; the AGPL-3.0-or-later + commercial dual licensing
+applies from the change recorded in `CHANGELOG.md` onward.

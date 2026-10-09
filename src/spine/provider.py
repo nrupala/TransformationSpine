@@ -1,5 +1,5 @@
 # Copyright 2026 Nrupal Akolkar
-# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Provider abstraction — the spine's contract with any inference engine.
 
 The whole point of the spine is **provider neutrality**: switching from
