@@ -179,10 +179,56 @@ def do_workflow_init(name: str, profile: str, output: str | None) -> None:
     wf = workflow_from_template(name, profile)
     output_file = output or f"{name}.json"
     save_workflow(wf, output_file)
-    print(f"Created workflow '{name}' at {output_file}")
+    # The documented deliverable is the validated Mermaid file; write it
+    # alongside the JSON definition (previously only JSON was produced).
+    mmd_file = f"{name}.mmd"
+    Path(mmd_file).write_text(generate_mermaid(wf), encoding="utf-8")
+    print(f"Created workflow '{name}' at {output_file} and {mmd_file}")
     print(f"Provider: {profile}")
     print("\nMermaid preview:")
     print(generate_mermaid(wf))
+
+
+def do_workflow_run(file: str, intent: str) -> None:
+    """Execute a workflow file through the spine's workflow engine."""
+    from spine.ctst import CTSTLedger
+    from spine.store import ContextStore
+    from spine.workflow import (
+        build_default_handlers,
+        execute_workflow,
+        load_workflow,
+        validate_workflow,
+    )
+
+    wf = load_workflow(file)
+    errors = validate_workflow(wf)
+    if errors:
+        print("Workflow is invalid:")
+        for e in errors:
+            print(f"  - {e}")
+        return
+
+    provider = None
+    load_env_config(_profile)
+    candidate = _spine_providers.get("llama.cpp")
+    if candidate is not None:
+        try:
+            if candidate.list_models():
+                provider = candidate
+        except Exception:
+            provider = None
+
+    handlers = build_default_handlers(
+        store=ContextStore(),
+        provider=provider,
+        ledger=CTSTLedger(),
+    )
+    run = execute_workflow(wf, handlers, initial_state={"input": intent})
+    print(f"Workflow '{wf.name}': {run.status}")
+    print(f"Order: {' -> '.join(run.order)}")
+    if run.failed_node:
+        print(f"Stopped at: {run.failed_node} {run.error}")
+    print(json.dumps(run.outputs, indent=2, default=str))
 
 
 def do_provider_list() -> None:
@@ -298,6 +344,15 @@ def main() -> None:
         help="Output file path (default: <name>.json)",
     )
 
+    run_parser = workflow_sub.add_parser("run", help="Execute a workflow file")
+    run_parser.add_argument("file", type=str, help="Workflow JSON/YAML file")
+    run_parser.add_argument(
+        "--intent",
+        type=str,
+        default="",
+        help="Input intent for the workflow's provider step",
+    )
+
     args = parser.parse_args()
 
     # Set global profile
@@ -320,6 +375,8 @@ def main() -> None:
     elif args.command == "workflow":
         if args.workflow_command == "init":
             do_workflow_init(args.name, args.profile, args.output)
+        elif args.workflow_command == "run":
+            do_workflow_run(args.file, args.intent)
     else:
         parser.print_help()
 

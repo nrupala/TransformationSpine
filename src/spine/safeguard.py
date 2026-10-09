@@ -33,31 +33,43 @@ def check_path_restriction(path: Path) -> dict[str, Any]:
         return {"path": str(path), "restricted": True, "within_project": False}
 
 
-def enforce_safeguards() -> list[dict[str, Any]]:
-    """Apply least-privilege file permissions to project directories.
+def enforce_safeguards(
+    root: Path | None = None,
+) -> list[dict[str, Any]]:
+    """Apply least-privilege file permissions under ``root``.
 
-    Returns a list of applied changes.
+    The actual enforcement: no file or directory in the project may be
+    world-writable — the world-write bit is stripped wherever found,
+    and only real changes are reported (with before/after modes).
+    (The previous implementation walked the tree and reported
+    "restrict/ok" for every directory without changing a single mode;
+    the report was fiction.)
     """
+    base = (root or _PROJECT_ROOT).resolve()
     changes: list[dict[str, Any]] = []
 
-    # Make project directories read-only for non-essential files
-    for dirpath, dirnames, _filenames in os.walk(_PROJECT_ROOT):
-        dir_path = Path(dirpath)
-        # Skip __pycache__ and .git
-        if "__pycache__" in dirnames:
-            dirnames.remove("__pycache__")
-        if ".git" in dirnames:
-            dirnames.remove(".git")
+    def _strip_world_write(path: Path) -> None:
+        mode = path.stat().st_mode
+        if mode & 0o002:
+            new_mode = mode & ~0o002
+            os.chmod(path, new_mode)
+            changes.append(
+                {
+                    "path": str(path),
+                    "action": "strip-world-write",
+                    "status": "applied",
+                    "before": oct(mode & 0o777),
+                    "after": oct(new_mode & 0o777),
+                }
+            )
 
-        # Restrict directory permissions
-        for dirname in dirnames:
-            subdir = dir_path / dirname
-            if subdir.is_dir() and ".git" not in str(subdir):
-                changes.append({
-                    "path": str(subdir),
-                    "action": "restrict",
-                    "status": "ok",
-                })
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [
+            d for d in dirnames if d not in ("__pycache__", ".git")
+        ]
+        _strip_world_write(Path(dirpath))
+        for filename in filenames:
+            _strip_world_write(Path(dirpath) / filename)
 
     return changes
 
@@ -87,6 +99,20 @@ def audit_permissions() -> list[dict[str, Any]]:
     return audit_results
 
 
+def world_writable_count(root: Path | None = None) -> int:
+    """Count world-writable files/dirs under the project (the enforce target)."""
+    base = (root or _PROJECT_ROOT).resolve()
+    count = 0
+    for dirpath, dirnames, filenames in os.walk(base):
+        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", ".git")]
+        if Path(dirpath).stat().st_mode & 0o002:
+            count += 1
+        for filename in filenames:
+            if (Path(dirpath) / filename).stat().st_mode & 0o002:
+                count += 1
+    return count
+
+
 def verify_write_protection(path: Path) -> bool:
     """Verify that a path outside the project is write-protected."""
     check = check_path_restriction(path)
@@ -102,8 +128,12 @@ if __name__ == "__main__":
 
     if command == "check":
         print(f"Project root: {_PROJECT_ROOT}")
-        print("Safeguards active: file access restricted to project directory")
-        print("All write operations outside project directory will be rejected")
+        count = world_writable_count()
+        print(f"World-writable files/directories: {count}")
+        print(
+            "Path restriction is advisory (check_path_restriction); "
+            "run 'enforce' to strip world-write permissions."
+        )
     elif command == "enforce":
         changes = enforce_safeguards()
         print(f"Applied {len(changes)} safeguard changes")
