@@ -63,6 +63,7 @@ def _run_gated_cycle(
     provider_name: str,
     prompt: str,
     context: Any,
+    max_tokens: int = 512,
 ) -> dict[str, Any]:
     """Run one gated transformation cycle against a registered provider.
 
@@ -84,7 +85,7 @@ def _run_gated_cycle(
     result: ProviderResult = provider.complete(
         prompt=prompt,
         context=context,
-        max_tokens=512,
+        max_tokens=max_tokens,
         temperature=0.0,
     )
     latency_ms = int((_time.time() - t0) * 1000)
@@ -276,16 +277,68 @@ def create_app() -> FastAPI:
         # Assemble in-scope context facts
         context_facts = store.visible_to(scope_enum)
 
-        # Build a prompt from those facts + the user's intent
-        prompt_parts = [
-            "\n".join(f"- {f.key}: {f.value}" for f in context_facts),
-            "",
-            f"Transform intent: {intent}",
-        ]
-        prompt = "\n".join(part for part in prompt_parts if part)
+        # Token-efficiency engine (ENGINE-SPEC-v1, as live in MyMilo):
+        # two-tier, cache-stable assembly under a budget derived from the
+        # route registry — never an unbounded context dump — and a
+        # planned output cap instead of a hardcoded max_tokens.
+        from spine.assembly import assemble_context
+        from spine.tokenplan import (
+            ContextOverflowError,
+            estimate_tokens,
+            plan_max_tokens,
+            route_spec,
+        )
 
-        # Run one gated cycle
-        result = _run_gated_cycle(provider, prompt, context_facts)
+        spec = route_spec(provider)
+        summary_fact = next(
+            (f for f in context_facts if f.key.startswith("session-summary:")),
+            None,
+        )
+        summary_text: str | None = None
+        summary_covers = 0
+        assembly_facts = context_facts
+        if summary_fact is not None:
+            summary_text = str(summary_fact.value)
+            assembly_facts = [f for f in context_facts if f is not summary_fact]
+            origin = summary_fact.origin or ""
+            if origin.startswith("compacted:"):
+                try:
+                    summary_covers = int(origin.split(":")[1])
+                except (IndexError, ValueError):
+                    summary_covers = 0
+
+        budget = max(
+            512,
+            spec.context_window - spec.margin - spec.default_max_tokens,
+        )
+        assembly = assemble_context(
+            assembly_facts,
+            query=intent,
+            summary=summary_text,
+            summary_covers=summary_covers,
+            budget_tokens=budget,
+        )
+        prompt = "\n\n".join(
+            part for part in (assembly.text, f"Transform intent: {intent}") if part
+        )
+        estimated_input = assembly.estimated_tokens + estimate_tokens(intent) + 16
+        try:
+            planned_max = plan_max_tokens(spec, estimated_input)
+        except ContextOverflowError as e:
+            raise HTTPException(status_code=400, detail=str(e)) from None
+
+        # Run one gated cycle with the planned output cap
+        result = _run_gated_cycle(
+            provider, prompt, context_facts, max_tokens=planned_max
+        )
+        token_plan = {
+            "route": spec.name,
+            "context_window": spec.context_window,
+            "estimated_input_tokens": estimated_input,
+            "planned_max_tokens": planned_max,
+            "facts_used": assembly.facts_used,
+            "facts_dropped": assembly.facts_dropped,
+        }
 
         # Record EVERY cycle in the CTST ledger — the ledger is the record
         # of transformation *attempts* (committed and rejected alike), with
@@ -310,6 +363,9 @@ def create_app() -> FastAPI:
                     **provider_result.telemetry,
                     "latency_ms": result["latency_ms"],
                     "error_signal": result["error_signal"],
+                    "estimated_input_tokens": token_plan["estimated_input_tokens"],
+                    "planned_max_tokens": token_plan["planned_max_tokens"],
+                    "context_window": token_plan["context_window"],
                 },
             )
             ctst_ledger.append(record)
@@ -323,6 +379,7 @@ def create_app() -> FastAPI:
             "verdict": result["verdict"],
             "committed": result["committed"],
             "gates": result["gates"],
+            "token_plan": token_plan,
             "context_rendered": _render_context(scope_enum),
         }
 
