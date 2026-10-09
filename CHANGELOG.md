@@ -2,6 +2,38 @@
 
 All notable changes to Transformation Spine are recorded here.
 
+## [Unreleased]
+
+### Added
+
+- **Connector plugin auto-discovery** — the 0.2.0 note below ("plugin
+  auto-discovery was planned but is not implemented") is superseded:
+  connectors now register three ways into one registry — built-ins,
+  the `spine.connectors` entry-point group (any installed
+  distribution), and plugin directories (`SPINE_CONNECTOR_PATH` env
+  var or a local `connectors/` directory). Broken plugins are
+  reported and skipped, never fatal. Configuration is uniform:
+  `SPINE_CONNECTOR_<NAME>_<PARAM>` env vars feed constructor params.
+  Surfaces: `GET /api/v1/connectors`,
+  `POST /api/v1/connectors/{name}/execute`,
+  `spine connector list|execute`.
+- **MCP server surface** — `POST /mcp` (Streamable HTTP, stateless)
+  and `spine mcp` (stdio). Tools: `spine_transform`, `spine_status`,
+  `spine_context`, `spine_ledger_verify`, `spine_connector_execute`,
+  one per connector capability (`<connector>__<tool>`), built-ins.
+- **A2A + ACP agent surfaces and a browser UI** — A2A agent card at
+  `/.well-known/agent-card.json`, JSON-RPC `message/send`/`tasks/get`
+  at `POST /a2a`; ACP `GET /acp/agents`,
+  `POST /acp/agents/{name}/runs`, `GET .../runs/{id}`; humans get
+  `GET /ui`. Every surface runs the one gated cycle
+  (`docs/serving.md` maps them all).
+
+### Changed
+
+- **portledger at 100% coverage** (was 61%; repo total ~83%).
+- `scripts/safeguard.sh` is committed executable (mode 100755); the
+  original API-based push could not set the exec bit.
+
 ## [0.2.0] - 2026-10-09
 
 ### Added — Upgrade scope per BUILD_PLAN.md
