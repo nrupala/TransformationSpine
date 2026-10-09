@@ -290,6 +290,17 @@ def create_app() -> FastAPI:
         records = ctst_ledger.read()
         return {"records": [r.to_dict() for r in records]}
 
+    @app.get("/api/v1/ledger/verify")
+    async def ledger_verify() -> dict[str, Any]:
+        """Verify the CTST hash chain from what is stored on disk."""
+        if ctst_ledger is None:
+            raise HTTPException(status_code=503, detail="Spine not initialized")
+        return {
+            "valid": ctst_ledger.verify_chain(),
+            "head_hash": ctst_ledger.head_hash,
+            "records": len(ctst_ledger.query()),
+        }
+
     @app.get("/api/v1/telemetry")
     async def telemetry_endpoint() -> dict[str, Any]:
         """Aggregated telemetry: provider latency, usage, convergence metrics."""

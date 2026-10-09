@@ -123,8 +123,23 @@ def do_transform(
         print(f"Transform request error: {e}")
 
 
-def do_ledger() -> None:
+def do_ledger(verify: bool = False) -> None:
     """Execute the ledger command."""
+    if verify:
+        try:
+            resp = httpx.get(
+                "http://127.0.0.1:8000/api/v1/ledger/verify", timeout=5.0
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                state = "VALID" if data["valid"] else "INVALID — chain broken"
+                print(f"CTST ledger chain: {state}")
+                print(f"Records: {data['records']}  Head: {data['head_hash'][:16]}")
+            else:
+                print(f"Ledger verify failed: {resp.status_code}")
+        except Exception as e:
+            print(f"Ledger verify error: {e}")
+        return
     try:
         resp = httpx.get("http://127.0.0.1:8000/api/v1/ledger", timeout=5.0)
         if resp.status_code == 200:
@@ -213,7 +228,14 @@ def main() -> None:
     subparsers.add_parser("context", help="Render current in-scope context")
 
     # spine ledger
-    subparsers.add_parser("ledger", help="Read CTST ledger entries")
+    ledger_parser = subparsers.add_parser(
+        "ledger", help="Read CTST ledger entries"
+    )
+    ledger_parser.add_argument(
+        "--verify",
+        action="store_true",
+        help="Verify the CTST hash chain instead of listing entries",
+    )
 
     # spine telemetry
     subparsers.add_parser("telemetry", help="Show aggregated telemetry metrics")
@@ -283,7 +305,7 @@ def main() -> None:
     elif args.command == "context":
         do_context()
     elif args.command == "ledger":
-        do_ledger()
+        do_ledger(verify=args.verify)
     elif args.command == "telemetry":
         do_telemetry()
     elif args.command == "provider":
