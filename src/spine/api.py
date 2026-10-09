@@ -543,17 +543,13 @@ def create_app() -> FastAPI:
         }
 
     @app.post("/api/v1/connectors/{name}/execute")
-    async def connector_execute(
-        name: str, payload: dict[str, Any]
-    ) -> dict[str, Any]:
+    async def connector_execute(name: str, payload: dict[str, Any]) -> dict[str, Any]:
         """Execute one tool on a discovered connector."""
         if connector_registry is None:
             raise HTTPException(status_code=503, detail="Spine not initialized")
         conn = connector_registry.get(name)
         if conn is None:
-            raise HTTPException(
-                status_code=404, detail=f"Unknown connector '{name}'"
-            )
+            raise HTTPException(status_code=404, detail=f"Unknown connector '{name}'")
         result = conn.execute(
             str(payload.get("tool", "")), dict(payload.get("params", {}))
         )
