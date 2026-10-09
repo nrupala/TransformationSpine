@@ -1292,6 +1292,8 @@ class ConfluenceConnector(MCPConnector):
 
         if page_id:
             url = f"{self.service_url}/rest/api/content/{page_id}?expand=body.storage,version"  # noqa: E501
+            resp = httpx.get(url, headers=headers, timeout=30)
+            data = resp.json() if resp.status_code == 200 else {}
         elif title and space_key:
             url = f"{self.service_url}/rest/api/content"
             params = {
