@@ -4,6 +4,32 @@ All notable changes to Transformation Spine are recorded here.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-10
+
+Closes the current development plan: the last open engine item is
+built, the tree is certified, and a public demo runs this release.
+
+### Added
+
+- **Estimator calibration (token-engine slice 4).** New
+  `spine/calibration.py`: per-route (estimated, actual) samples from
+  provider usage blocks (200-sample window); the correction factor
+  total-actual/total-estimated is clamped to [0.5, 2.0] and applied
+  to planning estimates once a route has 20+ samples; a
+  `calibration_warning` is reported when a trusted route's bias
+  exceeds 10%. Samples persist across restarts
+  (`SPINE_CALIBRATION_PATH`, default `calibration.json` under
+  `SPINE_LOG_DIR`) and calibration state is surfaced in
+  `/api/v1/status` and `/api/v1/telemetry`.
+- **Certification package.** `certification/` carries a SHA-256
+  manifest of the release tree, certificate **TS-CERT-2026-001**,
+  and the test record behind it; `scripts/certify.py` regenerates
+  and verifies the manifest (`--check`).
+- **Public demo.** A live instance of this release serves at
+  spine.aimlds.org (local profile, local model, no connector
+  credentials) — the browser UI, REST API, MCP endpoint, and A2A
+  agent card, with the CTST ledger verifiable in the open.
+
 ### Changed
 
 - **License: Apache-2.0 → AGPL-3.0-or-later + commercial dual
@@ -14,6 +40,18 @@ All notable changes to Transformation Spine are recorded here.
   was added and local machine paths were removed from docs and
   headers. Releases up to and including v0.2.0 remain under the
   Apache License 2.0 as published.
+
+### Fixed
+
+- `Providers.yaml` local profile endpoint no longer double-prefixes
+  `/v1` (the llama.cpp adapter appends it); the example as shipped
+  made every local provider call fail.
+
+### Removed
+
+- Internal working files (`DEVELOPMENT_PROGRESS_TRACKER.md`,
+  `cloud_code_setup.txt`, `opencode_setup.txt`) removed from the
+  public tree.
 
 ## [0.2.0] - 2026-10-09
 

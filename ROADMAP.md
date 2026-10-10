@@ -35,12 +35,16 @@ after the claim audit and remediation (see CHANGELOG).
   context owner across the stack; TransformationSpine owns context and
   provider selection, AxiomSpine stays the dispatch/verification
   kernel.
-- Estimator calibration: reconcile planned vs actual token counts in
-  telemetry and adjust route margins automatically (engine slice 4).
+- ~~Estimator calibration: reconcile planned vs actual token counts in
+  telemetry and adjust route margins automatically (engine
+  slice 4)~~ — shipped in v0.3.0 (`spine/calibration.py`: per-route
+  correction factors learned from recorded estimate-vs-actual pairs,
+  persisted across restarts, surfaced in status and telemetry).
 - Vector retrieval backend for the RAG agent behind the same
   interface (lexical scorer remains the fallback).
-- Plugin connector discovery via entry points (today connectors
-  register by import).
+- ~~Plugin connector discovery via entry points~~ — shipped in the
+  post-0.2.0 stack (connectors auto-discover via entry points and
+  plugin directories, alongside registration by import).
 
 ## Non-goals
 
