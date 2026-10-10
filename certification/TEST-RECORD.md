@@ -1,49 +1,39 @@
 # Copyright 2026 Nrupal Akolkar
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
-# Test Record — TransformationSpine v0.3.0
+# Test Record — TransformationSpine v0.3.1
 
-Evidence behind certificate TS-CERT-2026-001. All results are from
-the tree this record ships in (the manifest in this directory binds
-the exact bytes).
+Evidence behind certificate **TS-CERT-2026-002**, recorded
+2026-10-10. Automated gates run in a fresh virtual environment
+with `pip install -e ".[dev]"` and the proxy environment stripped
+(the ambient sandbox proxy variables corrupt HTTP client tests and
+do not exist in CI; CI on GitHub runs the same suite clean).
 
-## Automated gates
+## Automated gates (local, CI-faithful)
 
-- **Full test suite (fresh CI-faithful venv, `pip install -e ".[dev]"`,
-  proxy env stripped):** 191 passed, 0 failed — 178 at v0.2.0 plus 13
-  calibration tests (factor math, the 20-sample application
-  threshold, clamping, the 10% warning rule, persistence round-trip,
-  corrupt-file recovery, 200-sample window eviction, and one
-  end-to-end API test proving a learned factor changes planning and
-  is recorded).
-- **Coverage:** 84.79% total against the ≥80% CI gate;
-  `spine/calibration.py` at 95%.
-- **Lint/format/types:** `ruff check` clean, `ruff format --check`
-  clean, `mypy` strict clean over `src`.
-- **GitHub CI:** `verify (3.11)` and `verify (3.12)` green on the
-  calibration PR (#21) and on this release PR — see the repository's
-  Actions history for the runs bound to these commits.
+| Gate | Result |
+| --- | --- |
+| Test suite | **193 passed** (191 at v0.3.0 + 2 UI regression tests) |
+| Coverage | **85% total**, above the ≥ 80% floor |
+| `ruff check` | clean |
+| `ruff format --check` | clean |
+| `mypy` (strict, src) | clean |
+| Manifest self-check | `scripts/certify.py --check` — OK, 97 files |
 
-## Behavior verification (live instance)
+GitHub CI for the release PR runs the same suite on Python 3.11
+and 3.12; the release is tagged only on green.
 
-The public demo (spine.aimlds.org) runs this release on the local
-profile against a local model, verified 2026-10-10 before release:
+## Behavior evidence
 
-- `GET /api/v1/status` → ok; providers, tools, connectors listed.
-- `GET /.well-known/agent-card.json` → the spine's A2A card.
-- `GET /ui` → 200 (browser UI).
-- `POST /api/v1/transform` with a plain-language intent → verdict
-  **commit**, all gates passed (transport, output present, clean
-  finish), answer recorded in the CTST ledger.
-- `GET /api/v1/ledger/verify` → `valid: true` over the recorded
-  entries (hash chain intact, including the earlier rejected cycle —
-  attempts are recorded, not just successes).
-- `POST /mcp` `tools/list` → the spine's tool surface.
+- `GET /` on the new build returns the browser UI (200, byte-equal
+  to `GET /ui`) — the regression the release exists to fix.
+- The public demo (https://spine.aimlds.org) is redeployed from
+  the tagged v0.3.1 tree; its root URL serves the new UI, and a
+  real transform through the public tunnel returns a committed
+  verdict against the on-box model — recorded in the release notes.
 
-## Prior record
+## What was not re-verified for this patch
 
-v0.2.0 was released 2026-10-09 after an independent audit, a full
-remediation program, and a solved report per finding; the ASFQC
-gate record lives in `ASFQC/GATES.md`. This release changes no
-v0.2.0 behavior except the additions and the one configuration fix
-listed in `CHANGELOG.md`.
+- The v0.3.0 behavior evidence stands for all unchanged surfaces;
+  this patch changes only the browser UI, the root route, and
+  version identifiers.

@@ -23,7 +23,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST = ROOT / "certification" / "MANIFEST.sha256"
 
-EXCLUDED_DIRS = {".git", "__pycache__", ".venv", "node_modules", "htmlcov"}
+EXCLUDED_DIRS = {".git", "__pycache__", ".venv", "node_modules", "htmlcov", "logs"}
 EXCLUDED_FILES = {"certification/MANIFEST.sha256", "certification/CERTIFICATE.md"}
 EXCLUDED_SUFFIXES = (".egg-info",)
 
