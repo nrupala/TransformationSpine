@@ -82,12 +82,16 @@ python -m mypy src
 
 ## Status
 
-v0.1.0 — Core spine with provider abstraction, context lifecycle, CTST ledger,
-and MCP/ACP connectors. All 8 ASF gates PASS with recorded evidence.
+v0.1.0 — Core spine with provider abstraction, context lifecycle, and a
+CTST ledger.
 
-v0.2.0 — Completed per BUILD_PLAN.md: all 9 phases verified with pytest/ruff/mypy PASS,
-36 tests passing, enterprise roadmap documented, tool-call abstraction implemented,
-OS-level safeguarding in place. All ASF gates G0-G8 PASS with recorded evidence.
+v0.2.0 — Released 2026-10-09 after an independent audit and a full
+remediation program (see `CHANGELOG.md` and `ASFQC/GATES.md`): 178 tests,
+coverage held to a minimum of 80% in CI, CI green on Python 3.11 and
+3.12. Serving surfaces: REST API, MCP (HTTP and stdio), an A2A agent
+card, ACP runs, a browser UI, and the `spine` CLI. Connector
+auto-discovery via entry points and plugin directories; a CTST ledger
+with a verified hash chain; durable context persistence.
 <!-- coffee-support -->
 ## Support
 <a href="https://buymeacoffee.com/nrupalakolt" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" style="height:40px;" /></a>
