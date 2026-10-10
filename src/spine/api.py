@@ -822,6 +822,16 @@ def create_app() -> FastAPI:
 
         return HTMLResponse(content=UI_HTML)
 
+    @app.get("/")
+    async def root() -> Any:
+        """The site root serves the same UI — a visitor landing on /
+        gets the product, not a 404."""
+        from fastapi.responses import HTMLResponse
+
+        from spine.webui import UI_HTML
+
+        return HTMLResponse(content=UI_HTML)
+
     @app.get("/api/v1/telemetry")
     async def telemetry_endpoint() -> dict[str, Any]:
         """Aggregated telemetry: provider latency, usage, convergence metrics."""

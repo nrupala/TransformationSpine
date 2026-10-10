@@ -4,6 +4,21 @@ All notable changes to Transformation Spine are recorded here.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-10
+
+### Fixed
+
+- **The site root is the product now.** `GET /` serves the browser
+  UI; a visitor landing on the root no longer gets
+  `{"detail": "Not Found"}`.
+- **The browser UI explains itself.** Rewritten for a first-time
+  visitor: a plain-words lead, one obvious action ("Try it", with an
+  example filled in), results and gate verdicts rendered in words,
+  the record check explained before its button, and the raw status /
+  connector JSON moved into a "For developers" section — simplicity
+  on the surface, power underneath. Regression tests cover the root
+  route and the surface copy.
+
 ## [0.3.0] - 2026-10-10
 
 Closes the current development plan: the last open engine item is
