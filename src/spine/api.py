@@ -48,6 +48,7 @@ ctst_ledger: Any = None  # CTSTLedger — initialized in lifespan
 provider_map: dict[str, Any] = {}  # name → Provider instance
 tool_registry: Any = None  # ToolRegistry — initialized in lifespan
 connector_registry: Any = None  # ConnectorRegistry — initialized in lifespan
+calibrator: Any = None  # Calibrator — initialized in lifespan
 
 
 # ── Helper functions ─────────────────────────────────────────────────
@@ -150,6 +151,7 @@ def _init_state() -> None:
     stdio server) so every surface runs the identical spine.
     """
     global store, ctst_ledger, provider_map, tool_registry, connector_registry
+    global calibrator
 
     # Import the package modules after app starts to avoid circular deps
     from spine.ctst import CTSTLedger  # noqa: F811
@@ -161,6 +163,13 @@ def _init_state() -> None:
         path=os.environ.get("SPINE_CONTEXT_PATH", "spine-context.json")
     )
     ctst_ledger = CTSTLedger()
+
+    # Estimator calibration (engine slice 4): reloads its samples from
+    # disk (SPINE_CALIBRATION_PATH) so correction factors survive
+    # restarts. Construction never raises — a bad file means relearn.
+    from spine.calibration import Calibrator
+
+    calibrator = Calibrator()
 
     # Tool registry: definitions from tools.yaml when present, else the
     # built-in defaults. SPINE_TOOLS_PATH overrides the location.
@@ -273,13 +282,14 @@ def _init_state() -> None:
 def _teardown_state() -> None:
     """Release all spine state."""
     global store, ctst_ledger, tool_registry, connector_registry
-    global _a2a_agent, _acp_agent
+    global _a2a_agent, _acp_agent, calibrator
     _a2a_agent = None
     _acp_agent = None
     store = None
     ctst_ledger = None
     tool_registry = None
     connector_registry = None
+    calibrator = None
     provider_map.clear()
 
 
@@ -386,7 +396,17 @@ def execute_transform(
     prompt = "\n\n".join(
         part for part in (assembly.text, f"Transform intent: {intent}") if part
     )
-    estimated_input = assembly.estimated_tokens + estimate_tokens(intent) + 16
+    # Slice 4 calibration: the raw heuristic estimate is scaled by the
+    # route's learned correction factor (1.0 until the route has enough
+    # samples). Planning uses the calibrated number; the raw number is
+    # kept alongside it and is what gets recorded as the sample's
+    # "estimated" — the factor is defined against the raw heuristic, so
+    # recording the calibrated value would feed the correction back
+    # into itself.
+    cal = _get_calibrator()
+    raw_estimated_input = assembly.estimated_tokens + estimate_tokens(intent) + 16
+    estimated_input = cal.scale_estimate(raw_estimated_input, spec.name)
+    calibration_state = cal.state(spec.name)
     try:
         planned_max = plan_max_tokens(spec, estimated_input)
     except ContextOverflowError as e:
@@ -398,10 +418,24 @@ def execute_transform(
         "route": spec.name,
         "context_window": spec.context_window,
         "estimated_input_tokens": estimated_input,
+        "raw_estimated_input_tokens": raw_estimated_input,
         "planned_max_tokens": planned_max,
         "facts_used": assembly.facts_used,
         "facts_dropped": assembly.facts_dropped,
+        "calibration": calibration_state,
     }
+
+    # Reconcile estimate vs actual: the provider's usage block carries
+    # the authoritative input count for the cycle that just ran. Every
+    # completed cycle teaches the calibrator — committed or not, the
+    # tokens were spent. Recording is best-effort by construction.
+    cycle_result = result.get("provider_result")
+    if cycle_result is not None:
+        cal.record(
+            spec.name,
+            raw_estimated_input,
+            int(cycle_result.usage.get("prompt_tokens", 0)),
+        )
 
     # Record EVERY cycle in the CTST ledger — the ledger is the record
     # of transformation *attempts* (committed and rejected alike), with
@@ -476,7 +510,22 @@ def build_status() -> dict[str, Any]:
         },
         "tools": tool_registry.names() if tool_registry else [],
         "connectors": connector_registry.names() if connector_registry else [],
+        "calibration": _get_calibrator().snapshot(),
     }
+
+
+def _get_calibrator() -> Any:
+    """The shared estimator calibrator (lazy, like the agents below).
+
+    Initialized in the lifespan; created on first use when a surface
+    runs a transform without one.
+    """
+    global calibrator
+    if calibrator is None:
+        from spine.calibration import Calibrator
+
+        calibrator = Calibrator()
+    return calibrator
 
 
 _a2a_agent: A2AAgent | None = None
@@ -799,10 +848,13 @@ def create_app() -> FastAPI:
                 telemetry_by_provider[p]["error_signals"].append(r.error_signal)
                 telemetry_by_provider[p]["count"] += 1
 
-        # Compute aggregates
+        # Compute aggregates. Calibration state rides along: it is the
+        # live reconciliation of the estimates aggregated here against
+        # the providers' reported actuals (engine slice 4).
         agg: dict[str, Any] = {
             "providers": {},
             "total_ledger_entries": 0,
+            "calibration": _get_calibrator().snapshot(),
         }
         for provider, metrics in telemetry_by_provider.items():
             cs = metrics["count"]
