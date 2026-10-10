@@ -92,6 +92,14 @@ coverage held to a minimum of 80% in CI, CI green on Python 3.11 and
 card, ACP runs, a browser UI, and the `spine` CLI. Connector
 auto-discovery via entry points and plugin directories; a CTST ledger
 with a verified hash chain; durable context persistence.
+
+v0.3.0 — Released 2026-10-10. Closes the current development plan:
+estimator calibration (the token engine now learns per-route
+correction factors from estimate-vs-actual telemetry), a
+certification package under `certification/` (manifest, certificate
+TS-CERT-2026-001, test record — verify with
+`python3 scripts/certify.py --check`), and a public demo running
+this release at spine.aimlds.org.
 <!-- coffee-support -->
 ## Support
 <a href="https://buymeacoffee.com/nrupalakolt" target="_blank"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy me a coffee" style="height:40px;" /></a>
