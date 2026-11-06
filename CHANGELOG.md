@@ -1,3 +1,9 @@
+<!--
+SPDX-FileCopyrightText: 2026 Nrupal Akolkar
+
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Changelog
 
 All notable changes to Transformation Spine are recorded here.
