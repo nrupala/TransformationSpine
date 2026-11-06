@@ -3,6 +3,7 @@
 # Transformation Spine
 
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16398/badge)](https://www.bestpractices.dev/en/projects/16398)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/nrupala/TransformationSpine/badge)](https://scorecard.dev/viewer/?uri=github.com/nrupala/TransformationSpine)
 
 Provider-neutral transformation platform. Models are workers; the spine owns
 context, memory, decisions, governance, and provider selection — so outcome
