@@ -2,6 +2,8 @@
 <!-- SPDX-License-Identifier: AGPL-3.0-or-later -->
 # Transformation Spine
 
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/16398/badge)](https://www.bestpractices.dev/en/projects/16398)
+
 Provider-neutral transformation platform. Models are workers; the spine owns
 context, memory, decisions, governance, and provider selection — so outcome
 convergence holds no matter which engine runs beneath (llama.cpp, Codex,
