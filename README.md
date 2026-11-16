@@ -35,6 +35,45 @@ result converges when the gap to the committed artifact is zero. This is what
 makes a 8B llama.cpp model and a 70B Codex model converge to the same outcome —
 swapping an engine is a configuration change, not a data loss event.
 
+## Try it
+
+**Fastest — the hosted demo:** a public demo of v0.3.0 runs at
+[spine.aimlds.org](https://spine.aimlds.org). No install at all.
+
+**Self-host — from a clone** (the package is not on PyPI and the GitHub
+releases carry no binary assets; source is the install route today):
+
+```bash
+git clone https://github.com/nrupala/TransformationSpine.git
+cd TransformationSpine
+python -m pip install -e .
+python spine_cli.py --port 8793 &   # bare invocation = serve mode
+```
+
+Then ask it who it is — real responses, captured from this release:
+
+```bash
+$ curl -s localhost:8793/api/v1/status
+{"status":"ok","providers":[],"context_size":0,"ledger_entries":0,…,
+ "tools":["calculator","current_time","echo"],
+ "connectors":["azure-devops","confluence","databricks","github","jira","servicenow"],…}
+
+$ curl -s localhost:8793/.well-known/agent-card.json
+{"protocolVersion":"0.3.0","name":"transformationspine",
+ "description":"Provider-neutral transformation spine: gated LLM cycles over a
+ scoped, provenance-tracked context store, with a tamper-evident CTST ledger,…",
+ "version":"0.3.1",…}
+```
+
+Agents connect over MCP (`POST /mcp`, Streamable HTTP — or
+`python spine_cli.py mcp` for stdio), A2A (`POST /a2a`), or ACP
+(`POST /acp/agents/{name}/runs`); see [docs/serving.md](docs/serving.md)
+for every surface and [SKILL.md](SKILL.md) for the agent workflow.
+A transform result carries its own verdict: the cycle's **error signal**
+(0.0 = fully converged; anything above 0 means *not converged*) travels
+with the output — a non-converged result is reported as one, never
+dressed up as a success.
+
 ## Package
 
 ```
@@ -72,9 +111,16 @@ All phases maintain ASF gate compliance (G0-G8) with verified evidence.
 
 ## Install
 
+From a clone (see **Try it** above for the run commands that follow):
+
 ```bash
 python -m pip install -e ".[dev]"
 ```
+
+Run it: `python spine_cli.py` serves (bare invocation = serve mode);
+`python spine_cli.py status|context|ledger|telemetry|providers|connector|workflow`
+queries a running spine; `python spine_cli.py mcp` serves MCP over stdio
+for subprocess-style agent hosts.
 
 ## Test / verify
 
